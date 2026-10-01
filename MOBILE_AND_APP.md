@@ -78,8 +78,9 @@ desktop/mobile app. For desktop (Windows/Mac/Linux) builds, **Electron** or **Ta
 
 
 ## v4 notes (performance and touch)
-- **Updating an installed copy:** `sw.js` is now `VERSION = 'bummer-v4.0.1'`, so phones that installed v3.x fetch the new files on their next online launch. Bump it again with every release.
+- **Updating an installed copy:** `sw.js` is now `VERSION = 'bummer-v4.1.1'`, so phones that installed v3.x fetch the new files on their next online launch. Bump it again with every release.
 - **Phones start on MEDIUM.** The heaviest v4 effects (light shafts, heat shimmer, depth of field, bloom) are HIGH-only. MEDIUM keeps the 2.5D view, lit sprites and a reduced dust-mote count. LOW is the flat 2D renderer: it still gets snow cover, footprints, mist, the festival crowd and all the gameplay, but no motes, shafts or reflections.
+- **Battle HUD on touch:** the minimal HUD automatically switches to round thumb buttons at the bottom-right, with bigger text and a larger player strip. `Settings.hudTouch = false` keeps the mouse list.
 - HIGH trims itself if the phone can't keep up (v4.0.1). iPhone 12-class phones should still use AUTO or MEDIUM for battery and heat.
 - If an older phone stutters on HIGH, turn off single effects instead of dropping a whole level: `Settings.postFX = false`, `Settings.motes = false`, or `Settings.anim = false` (legacy animation, a little cheaper).
 - **Touch:** BOOST is a normal button next to the Break meter (tap to cycle ×1 → ×2 → ×3 → off). The JOB card sits in the card row. Path-action menus and the TRAVEL journal use full-size buttons.

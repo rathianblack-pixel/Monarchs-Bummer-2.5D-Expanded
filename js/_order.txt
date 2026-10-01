@@ -66,6 +66,7 @@ scenes/animlab.js
 data/travellers.js
 systems/travellers.js
 combat/boost.js
+combat/hud_min.js
 world/life.js
 core/mobile.js
 main.js

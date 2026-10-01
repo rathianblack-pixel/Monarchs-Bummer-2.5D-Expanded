@@ -268,9 +268,9 @@ const HD = {
     const x = this.lx, W = this.lc.width, H = this.lc.height, sx = W / L[2], sy = H / L[3];
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.fillStyle = rgb(this.amb[0], this.amb[1], this.amb[2]); x.fillRect(0, 0, W, H);
     x.globalCompositeOperation = 'lighter'; x.setTransform(sx, 0, 0, sy, -L[0] * sx, -L[1] * sy);
-    for (const [lx, ly, r, col, a] of this.lights) { const [R, G, B2] = hexToRgb(col); const gr = x.createRadialGradient(lx, ly, 0, lx, ly, r); gr.addColorStop(0, rgb(R, G, B2, .9 * a)); gr.addColorStop(.35, rgb(R, G, B2, .45 * a)); gr.addColorStop(1, rgb(R, G, B2, 0)); x.fillStyle = gr; x.fillRect(lx - r, ly - r, r * 2, r * 2); }
+    for (const [lx, ly, r, col, a] of this.lights) { if (lx + r < L[0] || lx - r > L[0] + L[2] || ly + r < L[1] || ly - r > L[1] + L[3]) continue; LightSprite.draw(x, col, 'l', lx, ly, r, a); } // off-map lights are skipped
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over';
-    const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, this.lightTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.lc); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, this.lightTex); if (this._lmUp) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.lc); else { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.lc); this._lmUp = true; } gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   },
   // ---------------- lit sprites: lights, soft shadows, water ----------------
   X0: [0, 0, 1],
@@ -284,7 +284,7 @@ const HD = {
     const oc = k.outline || (nk > .5 ? [.1, .08, .24] : [.24, .1, .2]); gl.uniform3f(sp.u.uOut, oc[0], oc[1], oc[2]);
     gl.uniform1f(sp.u.uLH, k.lightH || 22);
     const tx = k.tx || 0, ty = k.planeY !== undefined ? (k.th !== undefined ? k.planeY - 40 : k.planeY) : (k.ty || 0);
-    const cand = this.useLight ? this.lights.filter(l => l[4] > .05 && l[2] > 8).map(l => [l, l[4] * l[2] / (1 + Math.hypot(l[0] - tx, l[1] - ty) / 160)]).sort((a, b) => b[1] - a[1]).slice(0, this.NLM || 8) : [];
+    const cand = this.useLight ? this.lights.filter(l => l[4] > .05 && l[2] > 8).map(l => [l, l[4] * l[2] / (1 + Math.hypot(l[0] - tx, l[1] - ty) / 160)]).sort((a, b) => b[1] - a[1]).slice(0, Math.min(this.NLM || 8, Gfx.level >= 2 && Gfx.trim < 1 ? 8 : 4)) : []; // per-pixel lights: 8 on full HIGH, 4 when trimmed / MEDIUM
     const LP = this.LPa || (this.LPa = new Float32Array(32)), LC = this.LCa || (this.LCa = new Float32Array(24)); LP.fill(0); LC.fill(0);
     cand.forEach(([l], i) => { const c = hexToRgb(l[3]); LP[i * 4] = l[0]; LP[i * 4 + 1] = l[1]; LP[i * 4 + 2] = l[2] * 1.15; LP[i * 4 + 3] = 0; const a = Math.min(1.4, l[4]) * .95; LC[i * 3] = c[0] / 255 * a; LC[i * 3 + 1] = c[1] / 255 * a; LC[i * 3 + 2] = c[2] / 255 * a; });
     gl.uniform1i(sp.u.uNL, cand.length); if (sp.u['uLP[0]']) gl.uniform4fv(sp.u['uLP[0]'], LP.subarray(0, this.NLM * 4)); else if (sp.u.uLP) gl.uniform4fv(sp.u.uLP, LP.subarray(0, this.NLM * 4)); if (sp.u['uLC[0]']) gl.uniform3fv(sp.u['uLC[0]'], LC.subarray(0, this.NLM * 3)); else if (sp.u.uLC) gl.uniform3fv(sp.u.uLC, LC.subarray(0, this.NLM * 3));

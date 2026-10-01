@@ -32,14 +32,16 @@ const HUD = {
 function openSettings() {
   if (Overlays.has('settings')) return; SFX.play('page');
   const ov = Overlays.push({ name: 'settings', a: 0, update(dt) { this.a = Math.min(1, this.a + dt * 6);  }, draw() {
-    g.globalAlpha = this.a * .6; g.fillStyle = '#000'; g.fillRect(0, 0, 1280, 720); g.globalAlpha = this.a; const x = 390, y = 130 + (1 - this.a) * 20; UI.panel(x, y, 500, 460, { title: 'SETTINGS' });
+    g.globalAlpha = this.a * .6; g.fillStyle = '#000'; g.fillRect(0, 0, 1280, 720); g.globalAlpha = this.a; const x = 390, y = 110 + (1 - this.a) * 20; UI.panel(x, y - 20, 500, 560, { title: 'SETTINGS' });
     Settings.master = UI.slider('Master', x + 40, y + 80, 420, Settings.master); Settings.music = UI.slider('Music', x + 40, y + 120, 420, Settings.music); Settings.amb = UI.slider('Ambience', x + 40, y + 160, 420, Settings.amb); Settings.sfx = UI.slider('Sound FX', x + 40, y + 200, 420, Settings.sfx);
     Settings.text = UI.slider('Text speed', x + 40, y + 240, 420, Settings.text / 2, { fmt: v => (v * 2).toFixed(1) + '×' }) * 2; Settings.text = Math.max(.3, Settings.text);
     Settings.shake = UI.slider('Screen shake', x + 40, y + 280, 420, Settings.shake);
     UI.text('Flashes', x + 40, y + 322, { size: 15 }); if (UI.btn(Settings.flashes ? 'ON' : 'REDUCED', x + 190, y + 302, 120, 30, { size: 14 })) Settings.flashes = !Settings.flashes;
     UI.text('Graphics', x + 40, y + 362, { size: 15 }); if (UI.btn(Gfx.label(), x + 190, y + 342, 200, 30, { size: 14, id: 'gfxq' })) Gfx.cycle();
+    UI.text('Battle HUD', x + 40, y + 402, { size: 15 }); if (UI.btn(Settings.hud === 'classic' ? 'CLASSIC' : 'MINIMAL', x + 190, y + 382, 200, 30, { size: 14, id: 'hudq' })) Settings.hud = Settings.hud === 'classic' ? 'minimal' : 'classic';
+    UI.text('Battle camera', x + 40, y + 442, { size: 15 }); if (UI.btn(Settings.combatCam === 'wide' ? 'WIDE' : 'CLOSE', x + 190, y + 422, 200, 30, { size: 14, id: 'camq' })) Settings.combatCam = Settings.combatCam === 'wide' ? 'close' : 'wide';
     Audio.applyVolumes();
-    if (UI.btn('Done', x + 170, y + 390, 160, 40, { accent: true })) close();
+    if (UI.btn('Done', x + 170, y + 470, 160, 40, { accent: true })) close();
     g.globalAlpha = 1;
   } });
   function close() { saveSettings(); Overlays.pop(ov); SFX.play('page'); }
@@ -48,8 +50,8 @@ function openHelp() {
   if (Overlays.has('help')) return; SFX.play('page');
   const ov = Overlays.push({ name: 'help', a: 0, update(dt) { this.a = Math.min(1, this.a + dt * 6);  }, draw() {
     g.globalAlpha = this.a * .6; g.fillStyle = '#000'; g.fillRect(0, 0, 1280, 720); g.globalAlpha = this.a; const x = 290, y = 90; UI.panel(x, y, 700, 540, { title: 'HOW TO PLAY' });
-    const rows = [['Walk', 'Tap / click the ground'], ['Enter / talk', 'Tap a door or a person'], ['Dialogue', 'Tap or press SPACE'], ['Choices & cards', 'Tap them'], ['Timing (attack & defence)', 'SPACE or tap at the right moment'], ['Fire charge', 'Hold SPACE / finger, release in the zone'], ['Menus', 'Use the on-screen buttons'],
-      ['', ''], ['Combat', 'Pick a card. Make a bad decision. Timed hits are stronger;'], ['', 'tap at impact when attacked to Block or Perfect-parry.'], ['Break', 'Fills from perfect timing and damage taken.'], ['', 'When full, unleash your class ultimate.'], ['Intent', 'The top banner shows what the enemy plans next.'], ['Saving', 'Autosaves after battles, quests and rest. SAVE saves manually.']];
+    const rows = [['Walk', 'Tap / click the ground'], ['Enter / talk', 'Tap a door or a person'], ['Dialogue', 'Tap or press SPACE'], ['Choices & commands', 'Tap them'], ['Timing (attack & defence)', 'SPACE or tap at the right moment'], ['Fire charge', 'Hold SPACE / finger, release in the zone'], ['Menus', 'Use the on-screen buttons'],
+      ['', ''], ['Combat', 'Pick a command. Make a bad decision. Timed hits are stronger;'], ['', 'tap at impact when attacked to Block or Perfect-parry.'], ['Break', 'Fills from perfect timing and damage taken.'], ['', 'When full, unleash your class ultimate.'], ['Intent', 'The tag beside the enemy\'s name shows what it plans next.'], ['Saving', 'Autosaves after battles, quests and rest. SAVE saves manually.']];
     rows.forEach(([a, b], i) => { UI.text(a, x + 50, y + 84 + i * 28, { size: 15, col: COL.gold2, maxW: 210 }); UI.text(b, x + 270, y + 84 + i * 28, { size: 14, col: COL.cream, bold: false, maxW: 400 }); });
     if (UI.btn('Got it', x + 270, y + 480, 160, 38, { accent: true })) Overlays.pop(ov); g.globalAlpha = 1;
   } });

@@ -35,7 +35,7 @@ function weakOf(d) {
     _enter.call(this, a);
     const E = this.E, d = this.def; this.weak = weakOf(d);
     E.shMax = clamp(2 + (this.lvl >= 3 ? 1 : 0) + (this.boss ? 2 : 0) + (this.area >= 5 ? 1 : 0) + (d.cursed ? 1 : 0), 2, 7); if (this.raid) E.shMax = 3;
-    E.sh = E.shMax; E.broken = false; E.brkSkip = 0; this.bp = 1; this.boostSel = 0; this.boostNow = 0; this.boostedLast = false; this.jobSwap = null; this.jobMul = 1; this.brkFx = 0;
+    E.sh = E.shMax; E.broken = false; this.shPop = null; E.brkSkip = 0; this.bp = 1; this.boostSel = 0; this.boostNow = 0; this.boostedLast = false; this.jobSwap = null; this.jobMul = 1; this.brkFx = 0;
     const tr = Travel.st(); this.seen = tr.seen[d.id] || (tr.seen[d.id] = []);
   };
   const _exit = C.exit;
@@ -114,7 +114,7 @@ function weakOf(d) {
     // shield + weakness strip
     UI.panel(876, 194, 390, 40, { bg: 'rgba(16,12,20,.88)' });
     const bx = 900, by = 214; g.fillStyle = E.broken ? '#5a6a8a' : '#c8d8f0'; g.beginPath(); g.moveTo(bx - 12, by - 12); g.lineTo(bx + 12, by - 12); g.lineTo(bx + 12, by + 2); g.lineTo(bx, by + 13); g.lineTo(bx - 12, by + 2); g.closePath(); g.fill(); g.strokeStyle = '#1a1a2a'; g.lineWidth = 2; g.stroke();
-    const pop = this.shPop && this.ct - this.shPop.t < .3 ? 1 + (1 - (this.ct - this.shPop.t) / .3) * .5 : 1;
+    const pop = this.shPop && this.ct >= this.shPop.t && this.ct - this.shPop.t < .3 ? 1 + (1 - (this.ct - this.shPop.t) / .3) * .5 : 1;
     UI.text(E.broken ? '✕' : String(E.sh), bx, by + 6, { align: 'center', size: Math.round(16 * pop), col: '#1a1a2a', shadow: false });
     UI.text(E.broken ? 'BROKEN' : 'WEAK', 922, by + 5, { size: 12, col: E.broken ? '#a0c0e8' : COL.dim });
     this.weak.forEach((c, i) => { const x = 990 + i * 34; g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(x - 14, by - 14, 28, 28); if (this.seen.includes(c)) drawIcon(c, x, by, 24); else UI.text('?', x, by + 7, { align: 'center', size: 18, col: COL.dim }); });

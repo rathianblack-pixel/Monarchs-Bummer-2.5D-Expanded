@@ -1,5 +1,24 @@
 # Changelog
 
+## v4.1.1 — Night performance
+Night had about 15× more lights than day (43 vs 3 in the village), and two things got more expensive with every light:
+- **Light map:** every light used to build a brand-new radial gradient every frame (43 at night). Light blobs are now pre-rendered once per colour and reused, lights outside the visible area are skipped, and the light texture is updated in place. Same look; 0 gradients per frame instead of 43. The 2D/LOW renderer got the same fix, including its glow pass.
+- **Per-pixel sprite lighting** uses the 8 strongest lights on full HIGH, and 4 on MEDIUM or once adaptive HIGH has trimmed (it was always 8).
+
+## v4.1 — Minimal battle HUD
+The battle screen now gets out of the way so you can see the fighters and the backdrop. The old layout is still in Settings → Battle HUD → CLASSIC.
+- **Commands:** with mouse and keyboard, they're a slim list at the bottom-left with small icons. Only the hovered command shows its one-line description. On touch devices, they're a row of round thumb buttons at the bottom-right, with a big ATTACK button. Touch mode switches on automatically; `Settings.hudTouch = true/false` forces it.
+- **Enemy nameplate floats above the enemy:** name, thin HP bar, intent tag, shield count, weakness slots, and up to 3 trait/status words. It replaces the three boxes in the top-right.
+- **The separate Break bar is gone.** Your Break meter is a thin gold line under the BREAK command (a ring on touch). The Assist command works the same way in Act 2.
+- **Player info is one thin strip:** name, class/level, HP, Focus, statuses, BP pips and BOOST.
+- **No boxes:** the area name and turn number are a small tag in the top-left. Settings and sound are two faint words in the corner. The battle message and speech bubbles are plain text on a soft fade. The items menu is a soft list.
+- **The HUD slides away** whenever it isn't your turn: attacks, timing minigames, the enemy's move, Break ultimates and menus. It slides back in when you can act.
+- **Toasts** (Codex entry, quest updates…) no longer have boxes, anywhere in the game. They're also hidden while a menu is open.
+- **Battle camera:** new Settings → Battle camera, CLOSE (default) or WIDE. CLOSE zooms in a little and centres between the two fighters. HIGH/MEDIUM only.
+- New file: `js/combat/hud_min.js`.
+- Fix: at the start of a fight, the shield badge could appear screen-sized and shrink slowly. Its "pop" animation used a timestamp left over from the previous fight. It's now reset every fight and ignored if it's from the future.
+- Intent tags over the enemy are shortened ("STATUS" instead of "STATUS · Poison") so they don't overlap the HP bar.
+
 ## v4.0.1 — HIGH performance fix
 v4's HIGH setting was under-optimised: it did about 3× the per-frame CPU work of v3.1's HIGH.
 - **Sprite shading only processes the figure.** The CPU light/outline pass read back and shaded each character's whole scratch buffer, which is mostly empty and 4× bigger since 2× sprites arrived. It now tracks what was drawn and only touches that area, about 16× fewer pixels.
