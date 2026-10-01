@@ -46,6 +46,7 @@ Scenes.gallery = {
     if (UI.btn('▶', bx + 56, 670, 50, 36, { key: 'ArrowRight' })) this.page = (this.page + 1) % this.pages();
     if (UI.btn(this.sil ? 'COLOUR' : 'SILHOUETTE', bx + 120, 670, 140, 36, { accent: this.sil, key: ' ' })) this.sil = !this.sil;
     if (UI.btn(this.walk ? 'IDLE' : 'WALK', bx + 270, 670, 90, 36)) this.walk = !this.walk;
+    if (UI.btn('FRAMES', 24, 670, 110, 36)) Scene.go('animlab');
     if (UI.btn('GFX: ' + Gfx.label(), bx + 370, 670, 180, 36)) { Settings.gfx = Gfx.mode() === 'low' ? 'high' : 'low'; Gfx.apply(); }
     if (UI.btn('Title', bx + 560, 670, 90, 36, { style: 'ghost' })) { history.replaceState(null, '', location.pathname); Scene.go('title'); }
   }

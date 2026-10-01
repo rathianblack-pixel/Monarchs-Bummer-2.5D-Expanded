@@ -20,6 +20,17 @@ Beat Monarch Lucien and watch the credits. Someone knocks: press **A KNOCK AT TH
 - Saves are versioned (`SAVE_V = 3`). Older saves migrate automatically.
 - See `EXPANSION_PLAN.md` for the roster audit and scope, and `CHANGELOG.md` for the changes.
 
+## v4 — the "Octopath pass"
+- **TRAVEL** (HUD button): your Travellers journal. It covers chapters for each companion, who leads in battle, your secondary **JOB**, and town **reputation**.
+- **Path Actions:** tap a townsperson to get TALK plus whatever your travellers can do: **Inquire** (you or Pell), **Steal** (Honk), **Challenge** (Brendan) and **Provoke** (Lucien). Bev's shop and Marnie's pier at the port work the same way.
+- **Break & Boost:** foes have a shield count and hidden weaknesses. Break the shield with weakness hits (or PERFECT timing) and the foe loses a turn and takes ×1.5 damage. Bank **BP** each turn and spend up to 3 with **BOOST / [B]** before you attack.
+- **Living village:** lunch and evening crowds at the plaza, shop hours, sparrows, flags, lanterns, snow, footprints, mist, and chatter that changes after every boss.
+- **Labs:** `index.html?animlab` (animation key frames), `?gallery` (Model Sheet), `?deathlab` (finishers).
+- **Flags** (set in the console or in `audio/settings.js`): `Settings.anim`, `Settings.postFX`, `Settings.motes`, `Settings.weaponDeaths`, `Settings.hd` (set any of them to `false` to turn it off).
+
+### What v4 is not
+All characters and scenery are still **procedurally drawn in code**. v4 borrows HD-2D tricks: 2× sprite captures, per-pixel lights, soft shadows, reflections, depth of field, bloom, shafts, shimmer and motes. It also adds hand-keyed animation timing. But it is **not** hand-painted Octopath Traveler sprite art and won't look like it side by side. For that, commission a pixel artist for character sheets (8-direction walk, idle, attack, hurt at ~48–64 px) and tilesets. The renderer can already take image sprites via `HD.art` billboards.
+
 ## Code layout (`js/`)
 Plain scripts sharing globals, loaded in the order listed in `js/_order.txt` (same order as the `<script>` tags).
 
@@ -37,6 +48,7 @@ Plain scripts sharing globals, loaded in the order listed in `js/_order.txt` (sa
 | `overworld/` | map, map3d, road | world map (2D path) + **map3d**: the 2.5D diorama overworld (painted terrain, forests, mountains, hedge maze, fortress, pins, clouds), road encounters |
 | `combat/` | background, arena3d, core, actions, deaths, end, draw | top-down arena backdrops + foreground framing, **arena3d**: 2.5D combat dioramas with horizons/sky/animated props, turn flow & AI, minigames/attacks/defence, **per-monster gore death animations**, rewards/defeat, rendering & combat UI |
 | **Act II** | `characters/materials.js`, `characters/monsters_act2.js`, `data/content_act2.js`, `state/migrate.js`, `systems/progression.js`, `systems/companions.js`, `world/worlds.js`, `overworld/map_act2.js`, `village/port.js`, `combat/arena3d_act2.js`, `combat/act2.js`, `audio/music_act2.js`, `scenes/act2_story.js`, `scenes/gallery.js` | MAT colour ramps; new creature rigs; Act II areas, enemies, stories, lore, bounties, fish, achievements; save v3 + migration; perks/trinkets/achievements UI; companions + party; act system; Act II map; Port Mopeway; Act II arenas; boss mechanics/assist/cursed elites (wraps `Scenes.combat`); Act II music; knock/sail/endings/whale minigame; Model Sheet |
+| **v4** | `render/motes.js`, `characters/anim.js`, `scenes/animlab.js`, `data/travellers.js`, `systems/travellers.js`, `combat/boost.js`, `world/life.js` | dust motes + post-FX presets, animation layer v2, animation lab, traveller/path-action content, journal + path actions + jobs, Break & Boost + traveller leads, schedules/ambient life/snow/chatter |
 | | `main.js` | the frame loop |
 
 To add a file: put it in `js/`, add its path to `js/_order.txt` **and** a `<script>` tag in `index.html` (order matters: a file can only use things from files loaded before it at load time).
@@ -50,12 +62,12 @@ Each finisher adapts to the monster's blood colour and body family (flesh, beast
 Set `Settings.weaponDeaths = false` to bring back the original one-per-monster deaths.
 
 ## Testing
-`node tools/shot.js plan.json outDir` (Playwright + Chromium) loads the game headless, runs each plan step (`{name, gfx, setup, scene, args, wait, eval, query}`), saves a screenshot, and prints any console errors. Example screenshots are in `shots/before` and `shots/after`.
+`node tools/shot.js plan.json outDir` (Playwright + Chromium) loads the game headless, runs each plan step (`{name, gfx, setup, scene, args, wait, eval, query}`), saves a screenshot, and prints any console errors. v4 before/after comparison sheets (HIGH and LOW) and a feature sheet are in `shots/v4/`.
 
 ## Performance
 Settings → **Graphics**: AUTO (default) / HIGH / MEDIUM / LOW.
-- HIGH: **2.5D** village, overworld and combat (full res, depth of field + bloom), sprite shading, colour grade, full particles.
-- MEDIUM: 2.5D at lower internal resolution without depth of field/bloom, shading only on the hero and combatants, fewer particles.
+- HIGH: **2.5D** village, overworld and combat (full res, depth of field + bloom), 2× lit sprites with soft shadows and reflections, light shafts + heat shimmer, dust motes, colour grade, full particles.
+- MEDIUM: 2.5D at lower internal resolution without depth of field/bloom/shafts/shimmer, fewer motes, shading only on the hero and combatants, fewer particles.
 - LOW: the classic flat 2D renderer, no sprite shading or colour grade, half particles.
 Interiors, the road, title and cutscenes are always 2D.
 - AUTO starts on HIGH and steps down if the frame rate stays below ~42 fps.

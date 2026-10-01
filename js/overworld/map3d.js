@@ -290,7 +290,7 @@ Scenes.overworld.pickNode = function (rad = 14) {
 Scenes.overworld.drawHD = function () {
   ow3Build(); const t = this.t, nk = World.nightK(), night = nk > .5, lit = nk > .3; let c;
   HD.begin({ pitch: 38, fov: 40, zs: 'auto', tx: Cam.x - Cam.rx + Cam.sx, ty: Cam.y + Cam.sy + 10, zoom: (Cam.zoom + Cam.punch) * 1.05, maxBack: 360, clear: [.1, .14, .2],
-    fog: [560, 1100, .38 + World.fog * .3], fogC: night ? [.12, .13, .25] : [.74, .8, .92], cloud: nk < .8 ? .26 * (1 - nk) : 0, dof: [.2, .2, .92, .9], bloom: [.68, night ? .7 : .4], vig: .5 });
+    fog: [560, 1100, .38 + World.fog * .3], fogC: night ? [.12, .13, .25] : [.74, .8, .92], cloud: nk < .8 ? .26 * (1 - nk) : 0, dof: [.2, .2, .92, .9], bloom: [.68, night ? .7 : .4], vig: .5, shafts: sunShafts({ base: .42 }), motes: { n: 40, a: .35 } });
   HD.ground(vForestTile(), -900, -700, { w: MW + 1800, h: MH + 1400, rep: true });
   HD.ground(ow3Ground(), 0, 0);
   const lk = .75 + Math.sin(t * 2.2) * .15 + noise1(t * 3) * .1; HD.ground(ow3Lava(), 0, 0, { col: [lk, lk * .9, lk * .8, 3] });
@@ -324,7 +324,7 @@ Scenes.overworld.drawHD = function () {
   });
   // traveller
   const [px, py] = this.pos;
-  L.push([py + .4, () => HD.capture(py + 2.4, () => drawChar(px, py + 2, playerLook({ s: .9, face: this.face, walk: this.route ? this.walk : undefined, t })), null, 0, [px - 24, py - 46, 48, 52])]);
+  L.push([py + .4, () => HD.capture(py + 2.4, () => drawChar(px, py + 2, playerLook({ s: .9, face: this.face, walk: this.route ? this.walk : undefined, t })), null, 0, [px - 24, py - 46, 48, 52], HI_CHAR)]);
   L.sort((a, b) => a[0] - b[0]);
   for (const [, o, al] of L) { if (typeof o === 'function') { o(); continue; } const A = o.art, sc = o.sc || 1; HD.art(A.c, o.x - A.bx * sc, o.y - A.by * sc + (o.dy || 0), o.y, { alpha: al, scale: sc, sway: o.sway ? World.windSway(o.x, .5) * .8 : 0 }); }
   // chimney smoke + fortress embers (rising billboards)

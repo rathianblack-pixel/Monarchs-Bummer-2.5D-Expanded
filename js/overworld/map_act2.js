@@ -135,7 +135,7 @@ Scenes.overworld2 = { hd: true, timeRuns: true,
   pinArt(i) { const n = m2Nodes()[i]; if (n.type === 'side') return m2SidePin(n.kind, Map2.done(i)); const open = Map2.open(i); return owPin(n.type === 'port' ? 'home' : !open ? 'lock' : n.lvl === 4 ? 'boss' : 'open', String(n.lvl + 1)); },
   drawHD() {
     m2Build(); const t = this.t, N = m2Nodes(), nk = World.nightK(); let c;
-    HD.begin({ pitch: 38, fov: 40, zs: 'auto', tx: Cam.x - Cam.rx + Cam.sx, ty: Cam.y + Cam.sy + 10, zoom: (Cam.zoom + Cam.punch) * 1.05, maxBack: 360, clear: [.08, .16, .28], fog: [560, 1100, .4], fogC: nk > .5 ? [.1, .12, .26] : [.7, .8, .95], cloud: .2 * (1 - nk), dof: [.2, .2, .92, .9], bloom: [.66, .5], vig: .5 });
+    HD.begin({ pitch: 38, fov: 40, zs: 'auto', tx: Cam.x - Cam.rx + Cam.sx, ty: Cam.y + Cam.sy + 10, zoom: (Cam.zoom + Cam.punch) * 1.05, maxBack: 360, clear: [.08, .16, .28], fog: [560, 1100, .4], fogC: nk > .5 ? [.1, .12, .26] : [.7, .8, .95], cloud: .2 * (1 - nk), dof: [.2, .2, .92, .9], bloom: [.66, .5], vig: .5, shafts: sunShafts({ base: .42 }), motes: { n: 40, a: .35 } });
     HD.ground(m2SeaTile(), -900, -700, { w: MW2 + 1800, h: MH2 + 1400, rep: true }); HD.ground(m2Ground(), 0, 0);
     const v = HD.view, vx0 = v.x0 - 40, vx1 = v.x1 + 40, vy0 = v.y0 - 10, vy1 = v.y1 + 140;
     HD.layer('decal'); c = ctx;
@@ -151,7 +151,7 @@ Scenes.overworld2 = { hd: true, timeRuns: true,
     const wx = 700 + Math.sin(t * .05) * 90, wy = 470 + Math.cos(t * .05) * 30; L.push([wy, { art: { c: m2Fin(), bx: 20, by: 18 }, x: wx, y: wy, dy: Math.sin(t * .7) * 2 + 4 }, .55 + Math.sin(t * .3) * .25]);
     N.forEach((n, i) => { if (n.area >= 5 && this.fogA[n.area] > .5) return; const bob = i === this.sel ? Math.abs(Math.sin(t * 4)) * 2 : 0; L.push([n.y + .2, { art: this.pinArt(i), x: n.x, y: n.y, dy: -bob }, 1]); if (n.type !== 'port' && Map2.done(i)) L.push([n.y + .3, { art: { c: owC('chk', 9, 9, () => { pCirc(OLC, 4.5, 4.5, 4); pCirc('#7fc46a', 4.5, 4.5, 3); P('#f0fff0', 3, 4, 1, 2); P('#f0fff0', 4, 5, 1, 1); P('#f0fff0', 5, 2, 1, 3); }), bx: 4.5, by: 8 }, x: n.x + 7, y: n.y, dy: -22 - bob }, 1]); });
     const [px, py] = this.pos;
-    L.push([py + .4, () => HD.capture(py + 2.4, () => { if (this.sailing) { const b = m2Boat(0); ctx.drawImage(b.c, Math.round(px - 20), Math.round(py - 28 + Math.sin(t * 3))); drawChar(px - 2, py - 8 + Math.sin(t * 3), playerLook({ s: .8, face: this.face, t })); } else drawChar(px, py + 2, playerLook({ s: .9, face: this.face, walk: this.route ? this.walk : undefined, t })); }, null, 0, [px - 26, py - 50, 52, 56])]);
+    L.push([py + .4, () => HD.capture(py + 2.4, () => { if (this.sailing) { const b = m2Boat(0); ctx.drawImage(b.c, Math.round(px - 20), Math.round(py - 28 + Math.sin(t * 3))); drawChar(px - 2, py - 8 + Math.sin(t * 3), playerLook({ s: .8, face: this.face, t })); } else drawChar(px, py + 2, playerLook({ s: .9, face: this.face, walk: this.route ? this.walk : undefined, t })); }, null, 0, [px - 26, py - 50, 52, 56], HI_CHAR)]);
     L.sort((a, b) => a[0] - b[0]);
     for (const [, o, al] of L) { if (typeof o === 'function') { o(); continue; } const A = o.art, sc = o.sc || 1; HD.art(A.c, o.x - A.bx * sc, o.y - A.by * sc + (o.dy || 0), o.y, { alpha: al, scale: sc, sway: o.sway ? World.windSway(o.x, .5) * .8 : 0 }); }
     HD.layer('top'); c = ctx; Particles.draw(false);

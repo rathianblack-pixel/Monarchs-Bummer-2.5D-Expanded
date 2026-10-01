@@ -13,21 +13,22 @@ const SpriteFX = {
   // draw fn() (which draws around the origin at x,y) through the shading pass
   wrap(x, y, s, fn) {
     if (!this.on || this.depth > 0 || PAINT) { this.depth++; try { fn(x, y); } finally { this.depth--; } return; }
-    const W = Math.min(900, Math.ceil(150 * s / 8) * 8), H = Math.min(900, Math.ceil(160 * s / 8) * 8), ox = W / 2, oy = Math.round(H * .78);
-    const b = this.buf(W, H), bx = b.x; bx.setTransform(1, 0, 0, 1, 0, 0); bx.globalAlpha = 1; bx.globalCompositeOperation = 'source-over'; bx.clearRect(0, 0, W, H);
-    const prev = useCtx(bx); const fx = x - Math.round(x), fy = y - Math.round(y);
+    const q = ctx._q > 1 ? ctx._q : 1;
+    const Wl = Math.min(900, Math.ceil(150 * s / 8) * 8), Hl = Math.min(900, Math.ceil(160 * s / 8) * 8), ox = Wl / 2, oy = Math.round(Hl * .78), W = Wl * q, H = Hl * q;
+    const b = this.buf(W, H), bx = b.x; bx.setTransform(1, 0, 0, 1, 0, 0); bx.globalAlpha = 1; bx.globalCompositeOperation = 'source-over'; bx.clearRect(0, 0, W, H); bx.setTransform(q, 0, 0, q, 0, 0); bx._q = q;
+    const prev = useCtx(bx); const rx = Math.round(x * q) / q, ry = Math.round(y * q) / q, fx = x - rx, fy = y - ry;
     this.depth++; try { fn(ox + fx, oy + fy); } finally { this.depth--; useCtx(prev); }
-    this.shade(bx, W, H);
-    ctx.drawImage(b.c, Math.round(x) - ox, Math.round(y) - oy);
+    bx.setTransform(1, 0, 0, 1, 0, 0); this.shade(bx, W, H, q);
+    if (q > 1) ctx.drawImage(b.c, rx - ox, ry - oy, Wl, Hl); else ctx.drawImage(b.c, Math.round(x) - ox, Math.round(y) - oy);
   },
-  shade(bx, W, H) {
+  shade(bx, W, H, q = 1) {
     const id = bx.getImageData(0, 0, W, H), d = id.data, n = W * H;
     // bounds
     let x0 = W, y0 = H, x1 = -1, y1 = -1;
     const u = new Uint32Array(d.buffer, d.byteOffset, n);
     for (let y = 0; y < H; y++) { const row = y * W; let a = -1, z = -1; for (let x = 0; x < W; x++) if (u[row + x]) { a = x; break; } if (a < 0) continue; for (let x = W - 1; x >= a; x--) if (u[row + x]) { z = x; break; } if (a < x0) x0 = a; if (z > x1) x1 = z; if (y < y0) y0 = y; y1 = y; }
     if (x1 < 0) return;
-    x0 = Math.max(1, x0 - 1); y0 = Math.max(1, y0 - 1); x1 = Math.min(W - 2, x1 + 1); y1 = Math.min(H - 2, y1 + 1);
+    x0 = Math.max(2 * q, x0 - 1); y0 = Math.max(2 * q, y0 - 1); x1 = Math.min(W - 1 - 2 * q, x1 + 1); y1 = Math.min(H - 1 - 2 * q, y1 + 1);
     const m = this._m && this._m.length >= n ? this._m : (this._m = new Uint8Array(n)); // 0 = outside, 1 = outline, 2 = body
     for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) { const i = y * W + x, p = i * 4; m[i] = d[p + 3] < 190 ? 0 : 2; }
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -43,8 +44,8 @@ const SpriteFX = {
         if (j >= 0) { const q = j * 4; r = d[q] * .32 + 22; g = d[q + 1] * .24 + 12; b = d[q + 2] * .3 + 30; } else { r = 30; g = 18; b = 38; }
         d[p] = r; d[p + 1] = g; d[p + 2] = b; continue;
       }
-      const lit = out(i - W) || out(i - 1) || out(i - W - 1);
-      const sh1 = out(i + 1) || out(i + W + 1), sh2 = !sh1 && (out(i + 2) || out(i + W * 2 + 1));
+      const Wq = W * q, lit = out(i - Wq) || out(i - q) || out(i - Wq - q);
+      const sh1 = out(i + q) || out(i + Wq + q), sh2 = !sh1 && (out(i + 2 * q) || out(i + Wq * 2 + q));
       if (lit && !sh1) { r = r + (255 - r) * .26 + 6; g = g + (250 - g) * .22 + 4; b = b + (225 - b) * .14; }
       else if (sh1) { r = r * .70 + 6; g = g * .70 + 2; b = b * .78 + 16; }
       else if (sh2) { r = r * .84 + 3; g = g * .84 + 1; b = b * .88 + 9; }

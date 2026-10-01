@@ -3,19 +3,24 @@
    PIXEL ART PRIMITIVES (operate on active ctx)
    ========================================================= */
 let PAINT = null;
-function P(c, x, y, w = 1, h = 1) { ctx.fillStyle = PAINT || c; ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); }
+// ctx._q = internal super-sampling of the current target (HD hi-res sprite captures draw at 2x: positions snap to 1/q px)
+function P(c, x, y, w = 1, h = 1) { ctx.fillStyle = PAINT || c; const q = ctx._q; if (q > 1) { ctx.fillRect(Math.round(x * q) / q, Math.round(y * q) / q, Math.max(q, Math.round(w * q)) / q, Math.max(q, Math.round(h * q)) / q); return; } ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); }
 function pEll(c, cx, cy, rx, ry) {
-  ctx.fillStyle = PAINT || c; rx = Math.max(.5, rx); ry = Math.max(.5, ry); const y0 = Math.round(cy - ry), y1 = Math.round(cy + ry);
+  ctx.fillStyle = PAINT || c; rx = Math.max(.5, rx); ry = Math.max(.5, ry); const q = ctx._q;
+  if (q > 1) { const y0 = Math.round((cy - ry) * q), y1 = Math.round((cy + ry) * q); for (let Y = y0; Y < y1; Y++) { const dy = ((Y + .5) / q - cy) / ry; const k = 1 - dy * dy; if (k <= 0) continue; const hw = rx * Math.sqrt(k), a = Math.round((cx - hw) * q), b = Math.round((cx + hw) * q); ctx.fillRect(a / q, Y / q, Math.max(1, b - a) / q, 1 / q); } return; }
+  const y0 = Math.round(cy - ry), y1 = Math.round(cy + ry);
   for (let y = y0; y < y1; y++) { const dy = (y + .5 - cy) / ry; const k = 1 - dy * dy; if (k <= 0) continue; const hw = rx * Math.sqrt(k); ctx.fillRect(Math.round(cx - hw), y, Math.max(1, Math.round(cx + hw) - Math.round(cx - hw)), 1); }
 }
 function pCirc(c, cx, cy, r) { pEll(c, cx, cy, r, r); }
 function pEllO(c, o, cx, cy, rx, ry, t = 1) { pEll(o, cx, cy, rx + t, ry + t); pEll(c, cx, cy, rx, ry); }
 function pLine(c, x0, y0, x1, y1, th = 1) {
-  ctx.fillStyle = PAINT || c; const dx = x1 - x0, dy = y1 - y0, n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)))), o = Math.floor(th / 2);
+  ctx.fillStyle = PAINT || c; const dx = x1 - x0, dy = y1 - y0, n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)))), o = Math.floor(th / 2), q = ctx._q;
+  if (q > 1) { const m = n * q; for (let i = 0; i <= m; i++) { const t = i / m; ctx.fillRect(Math.round((x0 + dx * t - o) * q) / q, Math.round((y0 + dy * t - o) * q) / q, th, th); } return; }
   for (let i = 0; i <= n; i++) { const t = i / n; ctx.fillRect(Math.round(x0 + dx * t) - o, Math.round(y0 + dy * t) - o, th, th); }
 }
 function pPoly(c, pts) {
   ctx.fillStyle = PAINT || c; let minY = 1e9, maxY = -1e9; for (const p of pts) { minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
+  const q = ctx._q; if (q > 1) { for (let Y = Math.round(minY * q); Y <= Math.round(maxY * q); Y++) { const yy = (Y + .5) / q, xs = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; if ((a[1] <= yy && b[1] > yy) || (b[1] <= yy && a[1] > yy)) xs.push(a[0] + (yy - a[1]) / (b[1] - a[1]) * (b[0] - a[0])); } xs.sort((a, b) => a - b); for (let i = 0; i + 1 < xs.length; i += 2) { const a = Math.round(xs[i] * q), b = Math.round(xs[i + 1] * q); if (b > a) ctx.fillRect(a / q, Y / q, (b - a) / q, 1 / q); } } return; }
   minY = Math.round(minY); maxY = Math.round(maxY);
   for (let y = minY; y <= maxY; y++) {
     const yy = y + .5, xs = [];

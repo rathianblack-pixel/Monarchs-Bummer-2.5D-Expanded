@@ -27,9 +27,12 @@ function drawChar(x, y, o) {
   if (o.sq && o.sq !== 1) ctx.scale(1 + (1 - o.sq) * .7, o.sq);
   const body = o.body || 'sturdy', low = !!o.low;
   const bw = body === 'round' ? 15 : body === 'lanky' ? 10 : 13, legH = body === 'lanky' ? 12 : 10, torsoH = body === 'lanky' ? 14 : 13;
-  const brSp = low ? 1.4 : 2.2, br = Math.sin(t * brSp + seed) * (low ? 1 : .5);
+  const brSp = low ? 1.4 : 2.2, brA = low ? 1 : .5, walking = o.walk !== undefined && o.walk !== null;
+  // 4-frame breathing idle (held keys read as hand-animated pixel frames); smooth sine when ANIM8 is off
+  const br = typeof ANIM8 !== 'undefined' && ANIM8.on && !walking ? [-1, 0, 1, 0][(((Math.floor((t * brSp + seed) / (Math.PI / 2)) % 4) + 4) % 4)] * brA * 1.25 : Math.sin(t * brSp + seed) * brA;
   let walk = o.walk, legF = 0, legB = 0, liftF = 0, liftB = 0, bob = 0, armSwing = 0;
-  if (walk !== undefined && walk !== null) { legF = Math.sin(walk) * 3; legB = -legF; liftF = Math.max(0, -Math.cos(walk)) * 1.5; liftB = Math.max(0, Math.cos(walk)) * 1.5; bob = -Math.abs(Math.sin(walk)) * 1; armSwing = Math.sin(walk) * .6; }
+  if (walking && typeof ANIM8 !== 'undefined' && ANIM8.on) { const K = ANIM8.walk[(((Math.floor(walk / (Math.PI / 4) + .5) % 8) + 8) % 8)]; legF = K[0]; legB = -K[0]; liftF = K[1]; liftB = K[2]; bob = K[3]; armSwing = K[4]; }
+  else if (walking) { legF = Math.sin(walk) * 3; legB = -legF; liftF = Math.max(0, -Math.cos(walk)) * 1.5; liftB = Math.max(0, Math.cos(walk)) * 1.5; bob = -Math.abs(Math.sin(walk)) * 1; armSwing = Math.sin(walk) * .6; }
   const crouch = o.crouch || 0, lean = (o.lean || 0) + (low ? 1 : 0);
   const hipY = o.sit ? -9 : -legH + crouch * 3, topY = hipY - torsoH + br * .5 + bob;
   const tier = o.tier || 0, A = o.armor || ARMOR_TIERS[tier];
@@ -37,7 +40,11 @@ function drawChar(x, y, o) {
   if (o.shadow !== false) { ctx.globalAlpha = (o.alpha === undefined ? 1 : o.alpha) * .42; pEll('#24123a', 0, 0, 10 * s, 3 * s); pEll('#24123a', 0, 0, 7 * s, 2 * s); ctx.globalAlpha = o.alpha === undefined ? 1 : o.alpha; }
   // cape
   const capeC = o.cape || A.cape;
-  if (capeC) { const fl = Math.sin(t * 2.6 + seed) * 1.5 + (o.windCape || 0) + (walk !== undefined && walk !== null ? -2 : 0); pPoly(ol, [[-4 * s, (topY + 1) * s], [3 * s, (topY + 1) * s], [(-8 + fl) * s, (hipY + 9) * s], [(-13 + fl) * s, (hipY + 8) * s]].map(p => [p[0] - s, p[1]])); pPoly(capeC, [[-4 * s, (topY + 1) * s], [3 * s, (topY + 1) * s], [(-8 + fl) * s, (hipY + 8) * s], [(-12 + fl) * s, (hipY + 7) * s]]); L(shade(capeC, -.3), -6 + fl * .5, topY + 6, 1, 8); if (o.fur) E(o.fur, 0, topY + 1, 7, 3); }
+  if (capeC && o._cape) { const C = o._cape, f = [3, topY + 1], S2 = (p) => [p[0] * s, p[1] * s]; const front = [f, [C[2][0] + 5.5, C[2][1]], [C[4][0] + 4.5, C[4][1] + 1]], back = [[C[4][0] - 1, C[4][1]], [C[3][0] - 1, C[3][1]], [C[2][0] - 1, C[2][1]], [C[1][0], C[1][1]], [-4, topY + 1]];
+    pPoly(ol, front.concat(back).map(p => [(p[0] - 1) * s, (p[1] + .6) * s])); pPoly(capeC, front.concat(back).map(S2)); Ln(shade(capeC, -.3), C[1][0] + 2, C[1][1] + 1, C[3][0] + 2, C[3][1], 1); Ln(shade(capeC, .18), 2, topY + 2, C[2][0] + 4.5, C[2][1], 1); if (o.fur) E(o.fur, 0, topY + 1, 7, 3); }
+  else if (capeC) { const fl = Math.sin(t * 2.6 + seed) * 1.5 + (o.windCape || 0) + (walk !== undefined && walk !== null ? -2 : 0); pPoly(ol, [[-4 * s, (topY + 1) * s], [3 * s, (topY + 1) * s], [(-8 + fl) * s, (hipY + 9) * s], [(-13 + fl) * s, (hipY + 8) * s]].map(p => [p[0] - s, p[1]])); pPoly(capeC, [[-4 * s, (topY + 1) * s], [3 * s, (topY + 1) * s], [(-8 + fl) * s, (hipY + 8) * s], [(-12 + fl) * s, (hipY + 7) * s]]); L(shade(capeC, -.3), -6 + fl * .5, topY + 6, 1, 8); if (o.fur) E(o.fur, 0, topY + 1, 7, 3); }
+  // secondary-motion tails behind the body (long hair, scarf ends) from the chain sim
+  if (o._tail) { const C = o._tail, hc = o._tailC || o.hair || '#5a3a24'; for (let i = 0; i < C.length - 1; i++) Ln(ol, C[i][0], C[i][1], C[i + 1][0], C[i + 1][1], 5 - i * .7); for (let i = 0; i < C.length - 1; i++) Ln(hc, C[i][0], C[i][1], C[i + 1][0], C[i + 1][1], 3 - i * .5); L(shade(hc, .25), C[0][0], C[0][1], 1, 2); }
   // back arm
   const shB = [-bw / 2 + 2 + lean * .5, topY + 3], armLen = 9;
   const aB = (o.armB !== undefined ? o.armB : -.15 - armSwing) - (low ? .1 : 0);
@@ -49,7 +56,7 @@ function drawChar(x, y, o) {
   const drawLeg = (lx, lift, dark) => { if (o.sit) { const pc = dark ? shade(pants, -.25) : pants, bc = dark ? shade(boots, -.25) : boots; L(ol, lx - 1, hipY - 1, 11, legW + 2); L(pc, lx, hipY, 10, legW); L(ol, lx + 7, hipY, legW + 2, -hipY + 1); L(pc, lx + 8, hipY + 1, legW, -hipY - 3); L(bc, lx + 8, -3, legW + 2, 3); return; } const pc = dark ? shade(pants, -.25) : pants, bc = dark ? shade(boots, -.25) : boots; L(ol, lx - 1, hipY - 1, legW + 2, legH - lift + 1); L(pc, lx, hipY, legW, legH - 3 - lift); L(ol, lx - 1, -4 - lift, legW + 3, 4); L(bc, lx, -3 - lift, legW + 2, 3); L(shade(bc, .25), lx + 1, -3 - lift, 2, 1); };
   drawLeg(-4 + legB * .8, liftB, true); drawLeg(0 + legF * .8, liftF, false);
   // robe / skirt
-  if (o.robe) { const rc = o.robe; pPoly(ol, [[(-bw / 2 - 1 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + 1 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + 3) * s, (-1) * s], [(-bw / 2 - 3) * s, (-1) * s]]); pPoly(rc, [[(-bw / 2 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + 2) * s, (-2) * s], [(-bw / 2 - 2) * s, (-2) * s]]); L(shade(rc, -.25), -2, hipY, 1, -hipY - 3); L(shade(rc, .12), 3, hipY, 1, -hipY - 4); }
+  if (o.robe) { const rc = o.robe, hm = o._hem || 0; pPoly(ol, [[(-bw / 2 - 1 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + 1 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + 3 + hm) * s, (-1) * s], [(-bw / 2 - 3 + hm) * s, (-1) * s]]); pPoly(rc, [[(-bw / 2 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + lean * .3) * s, (hipY - 2) * s], [(bw / 2 + 2 + hm) * s, (-2) * s], [(-bw / 2 - 2 + hm) * s, (-2) * s]]); L(shade(rc, -.25), -2, hipY, 1, -hipY - 3); L(shade(rc, .12), 3, hipY, 1, -hipY - 4); }
   // torso
   const tx = -bw / 2 + lean * .6;
   L(ol, tx - 1, topY - 1, bw + 2, torsoH + 2);
@@ -67,7 +74,7 @@ function drawChar(x, y, o) {
   const beltC = o.belt || A.belt; if (beltC && !o.robe) { L(beltC, tx, hipY - 3, bw, 2); L('#d8b060', tx + bw / 2 + 1, hipY - 3, 2, 2); }
   if (o.dmg > .3) { const r = RNG(seed + 3); for (let i = 0; i < 4; i++) L(shade(topC, -.45), tx + r.i(1, bw - 3), topY + r.i(2, torsoH - 2), r.i(1, 3), 1); L('#6a4a3a', tx + 2, hipY - 1, 2, 1); }
   // head
-  const hx = 1 + lean + (o.headX || 0), hy = topY - 8 + br * .3 + (low ? 1 : 0) + (o.headY || 0);
+  const hx = 1 + lean + (o.headX || 0), hy = topY - 8 + br * .3 + (low ? 1 : 0) + (o.headY || 0) + (walking && typeof ANIM8 !== 'undefined' && ANIM8.on ? ANIM8.walk[(((Math.floor(walk / (Math.PI / 4) + .5) % 8) + 7) % 8)][3] * .5 - bob * .5 : 0);
   drawHead(hx, hy, o, s, t, ol, skin, skinD);
   // front arm
   const shF = [bw / 2 - 3 + lean * .7, topY + 3];
@@ -135,7 +142,7 @@ function drawHead(hx, hy, o, s, t, ol, skin, skinD) {
 function drawFace(hx, hy, o, s, t, ol, sk, ht) {
   const L = (c, a, b, w, h) => P(c, a * s, b * s, w * s, h * s);
   const expr = o.expr || 'neutral', seed = o.seed || 0;
-  const blink = ((t + seed * 1.37) % 3.9) < .12 && expr !== 'hurt';
+  const bp = (t + seed * 1.37) % 3.9, dbl = (seed % 3) === 1 && bp > .34 && bp < .44, blink = (bp < .12 || dbl) && expr !== 'hurt', half = !blink && expr !== 'hurt' && (bp < .19 || bp > 3.84 || (seed % 3 === 1 && bp > .27 && bp < .5));
   const look = o.look === undefined ? (Math.sin(t * .5 + seed) > .85 ? -1 : 0) : o.look;
   const ex1 = hx + 1, ex2 = hx + 5, ey = hy - 1;
   const eyeC = o.eye || '#2a1a14', white = '#fbf6ea';
@@ -152,6 +159,7 @@ function drawFace(hx, hy, o, s, t, ol, sk, ht) {
     const px = look < 0 ? 0 : 1; L(eyeC, ex1 + px, ey, 1, 2); L(eyeC, ex2 + px, ey, 1, 2);
     if (o.eyeGlow) { L(o.eyeGlow, ex1 + px, ey, 1, 1); L(o.eyeGlow, ex2 + px, ey, 1, 1); }
     if (lid) { L(shade(sk, -.3), ex1, ey, 2, 1); L(shade(sk, -.3), ex2, ey, 2, 1); }
+    if (half) { const lc = shade(sk, -.2); L(lc, ex1, ey - (tall - 3), 2, tall - 1); L(lc, ex2, ey - (tall - 3), 2, tall - 1); L(ol, ex1, ey + 1, 2, 1); L(ol, ex2, ey + 1, 2, 1); }
   }
   if (expr === 'annoyed' || expr === 'angry') { L(ol, ex1 - 1, ey - 3, 2, 1); L(ol, ex1 + 1, ey - 2, 1, 1); L(ol, ex2 + 1, ey - 3, 2, 1); L(ol, ex2, ey - 2, 1, 1); }
   else if (expr === 'surprise') { L(ol, ex1, ey - 4, 2, 1); L(ol, ex2, ey - 4, 2, 1); }

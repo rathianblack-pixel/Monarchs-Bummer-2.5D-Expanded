@@ -39,17 +39,17 @@ Object.assign(Scenes.combat, {
     if (P.m && this.phase === 'intro') o.walk = this.ct * 10;
     const mgOn = !!this.mg;
     switch (P.pose) {
-      case 'windup': o.armF = 2.7; o.crouch = 2; o.lean = -1; o.expr = 'angry'; if (mgOn) o.armF += Math.sin(T * 40) * .03; break;
-      case 'strike': { const k = Ease.outQ(clamp(pt / .1, 0, 1)); o.armF = lerp(2.7, .5, k); o.lean = 2; o.expr = 'angry'; break; }
+      case 'windup': { const k = Ease.outQ(clamp(pt / .16, 0, 1)); o.armF = lerp(1.2, 2.7, k) + (k >= 1 ? .08 : 0); o.crouch = 2 * k; o.lean = -1.4 * k; o.sq = 1 - .07 * k; o.expr = 'angry'; } if (mgOn) o.armF += Math.sin(T * 40) * .03; break;
+      case 'strike': { const k = Ease.outQ(clamp(pt / .1, 0, 1)), f = clamp((pt - .1) / .28, 0, 1); o.armF = lerp(2.7, .2, k) + Math.sin(f * Math.PI) * -.15 + f * .3; o.lean = 2 + Math.sin(clamp(pt / .3, 0, 1) * Math.PI) * 1.2; o.sq = pt < .06 ? 1.07 : 1 - Math.sin(f * Math.PI) * .04; o.expr = 'angry'; break; }
       case 'draw': o.armF = 1.57; o.armB = 1.3; o.draw = mgOn ? 1 : clamp(pt / .2, 0, 1); o.nocked = true; o.expr = 'annoyed'; break;
-      case 'release': o.armF = 1.57; o.armB = 1.2; o.draw = 0; o.lean = -1; break;
+      case 'release': { const f = clamp(pt / .3, 0, 1); o.armF = 1.57 + Math.sin(f * Math.PI) * .12; o.armB = 1.2 - (1 - f) * .3; o.draw = 0; o.lean = -1 - (1 - f) * 1.2; o.sq = 1 - (1 - f) * .04; break; }
       case 'cast': o.armF = 2.2 + (mgOn && this.mg.fill ? Math.sin(T * 50) * this.mg.fill * .06 : 0); o.lean = 1; o.expr = 'angry'; break;
-      case 'raise': o.armF = 3.0; o.expr = 'surprise'; break;
+      case 'raise': { const k = Ease.outQ(clamp(pt / .18, 0, 1)); o.armF = lerp(1.6, 3.0, k) + (1 - k) * 0 + Math.sin(clamp(pt / .4, 0, 1) * Math.PI) * .1; o.sq = 1 + Math.sin(k * Math.PI) * .05; o.expr = 'surprise'; break; }
       case 'guard': if (cls === 'bow') { o.crouch = 2; o.lean = -1; } else { o.armF = 1.9; o.crouch = 1; if (cls === 'sword') o.wAng = .1; } break;
-      case 'hurt': if (pt < .35) { o.expr = 'hurt'; o.lean = -2; o.rot = -.08; } break;
+      case 'hurt': if (pt < .35) { o.expr = 'hurt'; o.lean = -2; o.rot = -.08 * (1 - pt / .35); o.sq = pt < .08 ? .92 : 1 + Math.sin(clamp((pt - .08) / .27, 0, 1) * Math.PI) * .04; } break;
       case 'eat': o.armF = 2.7; o.expr = 'happy'; break;
       case 'dead': o.rot = -Math.min(1.5, pt * 3); o.expr = 'hurt'; o.armF = .6; break;
-      case 'victory': o.armF = 3.0; o.expr = 'happy'; P.jy = pt < 1.2 ? -Math.abs(Math.sin(pt * 7)) * 5 : 0; break;
+      case 'victory': { o.armF = 3.0; o.expr = 'happy'; const j = Math.sin(pt * 7); P.jy = pt < 1.2 ? -Math.abs(j) * 5 : 0; if (pt < 1.3 && Math.abs(j) < .25) o.sq = .93; else if (pt < 1.2) o.sq = 1.04; break; }
     }
     if (this.cue && P.pose === 'idle') { o.crouch = 1; o.expr = 'annoyed'; }
     if (P.brace > 0) { o.crouch = 2; o.armF = 1.8; }
@@ -96,9 +96,11 @@ Object.assign(Scenes.combat, {
     if (hd) {
       const pal = a3def(this.area, this.raid).pal;
       HD.begin({ pitch: 13, fov: 38, zs: 1, tx: Cam.x - Cam.rx + Cam.sx, ty: CGY, th: CGY - Cam.y + Cam.ry - Cam.sy, zoom: Cam.zoom + Cam.punch, yaw: Math.sin(T * .12) * 2.5 + (Cam.x - 320) * .02, planeY: CGY, maxBack: 1200,
-        lightRect: [-700, CGY - 1200, 2040, 1460], fog: [900, 2600, .4], fogC: pal.fog, clear: pal.clear, dof: [.3, .2, .87, .95], bloom: [.66, .5], vig: .55 });
+        lightRect: [-700, CGY - 1200, 2040, 1460], fog: [900, 2600, .4], fogC: pal.fog, clear: pal.clear, dof: [.3, .2, .87, .95], bloom: [.66, .5], vig: .55,
+        shafts: combatShafts(this.area, this.raid), motes: combatMotes(this.area, this.raid) });
+      combatShimmer(this);
       drawArena3D(this.area, this.raid, t, { dark: this.dark, wallShift: this.wallShift, bolt: this.bolt }, false);
-      L = HD.layer('plane', { ox: -160, oy: -80, w: 960, h: 440 }); HD.planeL = L; Cam.apply(ctx, 1);
+      L = HD.layer('plane', { ox: -160, oy: -80, w: 960, h: 440, q: HD.Q }); HD.planeL = L; Cam.apply(ctx, 1);
     } else {
       c.setTransform(1, 0, 0, 1, 0, 0); P('#000', 0, 0, 640, 360);
       c.setTransform(1, 0, 0, 1, 0, 0);
@@ -118,7 +120,7 @@ Object.assign(Scenes.combat, {
     Light.apply();
     if (hd) {
       Cam.apply(ctx, 1); Particles.draw(true);
-      HD.plane(L.c, L.ox, L.oy, CGY, { w: L.w, h: L.h }); HD.planeL = null;
+      HD.plane(L.c, L.ox, L.oy, CGY, { w: L.w, h: L.h, q: L.q, plane: true, lit: true }); HD.shadow(this.P.x, CGY + 2, 15); if (this.E.pose !== 'dead') HD.shadow(this.E.x, CGY + 2, Math.min(40, 12 + this.E.h * .15)); HD.planeL = null;
       drawArena3D(this.area, this.raid, t, { dark: this.dark, wallShift: this.wallShift, bolt: this.bolt }, true);
       HD.screenLayer(); if (this.dark > .01) { ctx.globalAlpha = this.dark * .25; P('#08040e', 0, 0, 640, 360); ctx.globalAlpha = 1; }
       if ((this.area === 0 || this.raid) && World.rain > .05) Weather.draw(CGY + 60, World.rain * .7);
@@ -172,9 +174,10 @@ Object.assign(Scenes.combat, {
   drawCards() {
     const on = this.phase === 'player' && !Overlays.stack.length; this.cardK = (this.cardK || 0) + ((on ? 1 : 0) - (this.cardK || 0)) * Math.min(1, DT * 10);
     const cls = CLASSES[S.cls], defs = [['attack', 'ATTACK', S.cls, 'Timed ' + (S.cls === 'sword' ? 'strike' : S.cls === 'bow' ? 'shot' : 'spell')], ['guard', cls.guard, S.cls === 'bow' ? 'evade' : 'guard', S.cls === 'bow' ? 'Dodge chance, counter' : 'Halve damage, +3 ' + Stats.manaName()], ['skill', cls.skill, 'skill_' + S.cls, `${cls.skillDesc} (4 ${Stats.manaName()})`], ['items', 'ITEMS', 'items', 'Potions & tricks'], ['break', 'BREAK', 'break', this.brk >= 100 ? cls.ult : `Fill the meter (${Math.floor(this.brk)}%)`]];
+    if (this.jobDef) { const jd = this.jobDef(); if (jd) defs.splice(3, 0, jd); }
     const w = 164, h = 150, gap = 14, x0 = 640 - (defs.length * (w + gap) - gap) / 2, y = 560 + (1 - this.cardK) * 170;
     defs.forEach(([k, title, ic, sub], i) => {
-      const x = x0 + i * (w + gap), dis = (k === 'skill' && !this.canSkill()) || (k === 'break' && this.brk < 100), live = on && UI.interactive(), hov = live && UI.inRect(x, y - 10, w, h + 10), id = 'card' + k;
+      const x = x0 + i * (w + gap), dis = (k === 'skill' && !this.canSkill()) || (k === 'break' && this.brk < 100) || (k === 'job' && !this.canJob()), live = on && UI.interactive(), hov = live && UI.inRect(x, y - 10, w, h + 10), id = 'card' + k;
       const st = UI.hot[id] || (UI.hot[id] = { h: 0 }); st.h += ((hov ? 1 : 0) - st.h) * Math.min(1, DT * 14); st.seen = T; if (hov) { UI.hoverId = id; UI.cursor = 'pointer'; }
       const yy = y - st.h * 16 - (k === 'break' && !dis ? Math.sin(T * 6) * 3 : 0);
       g.save(); if (dis) g.globalAlpha = .55;

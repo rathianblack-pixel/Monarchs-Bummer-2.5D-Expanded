@@ -349,7 +349,9 @@ Scenes.village = { hd: true,
     const nk = World.nightK(), night = World.isNight();
     if (hd) {
       HD.begin({ pitch: 44, fov: 42, zs: 'auto', tx: Cam.x - Cam.rx + Cam.sx, ty: Cam.y + Cam.sy, zoom: Cam.zoom + Cam.punch, maxBack: 330, clear: [.09, .16, .1],
-        fog: [640, 1150, .32 + World.fog * .4], fogC: night ? [.12, .14, .26] : [.72, .8, .9], cloud: nk < .8 ? .2 * (1 - nk) * (1 - World.rain * .5) : 0, dof: [.17, .16, .9, .95], bloom: [.7, night ? .6 : .35], vig: .55 });
+        water: typeof Life !== 'undefined' && World.rain > .3 ? Life.rainMask() : HD.waterMask('village', [0, 0, VW, VH], (x, y) => x > RIVER.x0(y) + 3 && x < RIVER.x1(y) - 3 && !(y > RIVER.bridgeY0 - 2 && y < RIVER.bridgeY1 + 2), [.22, .36, .5]),
+        fog: [640, 1150, .32 + World.fog * .4], fogC: night ? [.12, .14, .26] : [.72, .8, .9], cloud: nk < .8 ? .2 * (1 - nk) * (1 - World.rain * .5) : 0, dof: [.17, .16, .9, .95], bloom: [.7, night ? .6 : .35], vig: .55, shafts: sunShafts({ base: .8 }), motes: { n: 80 } });
+      HD.shimmerAt(B.smith.x + 30, B.smith.y - 10, 20, 34, .6);
       HD.ground(vForestTile(), -900, -700, { w: VW + 1800, h: VH + 1400, rep: true }); HD.ground(this.ground, 0, 0);
       HD.layer('decal'); c = ctx;
     } else { P('#3a6a3a', 0, 0, 640, 360); Cam.apply(c, 1); }
@@ -360,9 +362,10 @@ Scenes.village = { hd: true,
     for (const f of this.fishes) { f.t += DT; f.y += f.d * 9 * DT; if (f.y < 80 || f.y > VH - 40) f.d *= -1; if (f.y > RIVER.bridgeY0 - 6 && f.y < RIVER.bridgeY1 + 6) f.y += f.d * 20 * DT; const fx = lerp(RIVER.x0(f.y), RIVER.x1(f.y), .5 + Math.sin(f.t * .7) * .2); c.globalAlpha = .7; P('#e8903a', fx, f.y, 1, 4); P('#f8b860', fx, f.y + (f.d > 0 ? 3 : 0), 1, 1); P('#e8903a', fx - 1, f.y - f.d * 2 + 1, 3, 1); c.globalAlpha = 1; }
     // puddles
     if (World.rain > .3) { c.globalAlpha = World.rain * .55; for (let i = 0; i < 26; i++) { const r = RNG(i + 700), x = r() * VW, y = 100 + r() * (VH - 120); if (x < vx0 || x > vx1 || vSurface(x, y) === 'grass') continue; pEll('#8ab0d8', x, y, r.r(6, 14), r.r(2, 4)); const rp = (t * 1.5 + r()) % 1; c.globalAlpha = World.rain * .5 * (1 - rp); c.strokeStyle = '#d8e8ff'; c.beginPath(); c.ellipse(Math.round(x + r.r(-4, 4)), Math.round(y), rp * 5, rp * 2, 0, 0, TAU); c.stroke(); c.globalAlpha = World.rain * .55; } c.globalAlpha = 1; }
+    if (typeof Life !== 'undefined') Life.villageDecal(c, t, vx0, vy0, vx1, vy1, hd);
     if (hd) HD.groundLayer('decal');
     // ---- depth-sorted world objects ----  (key: cache the drawing as a static billboard; true = fn emits HD quads itself)
-    const L = []; const add = (y, fn, key, ver, rect) => L.push([y, fn, key, ver, rect]);
+    const L = []; const add = (y, fn, key, ver, rect, o) => L.push([y, fn, key, ver, rect, o]);
     const bl = (k, o) => { const b = B[k], a = this.bld[o || k]; add(b.y, () => { ctx.drawImage(a.c, b.x - a.ox, b.y - a.oy); if (hd) this.drawWindows(t, nk); }, 'bld' + (o || k), Math.round(nk * 6), [b.x - a.ox, b.y - a.oy, a.c.width, a.c.height]); };
     bl('house'); bl('merchant'); bl('smith'); bl('cath');
     // trees
@@ -400,20 +403,21 @@ Scenes.village = { hd: true,
     // wolf pelts on the garden fence (after Gloomfang)
     add(416, () => { tdFenceH(214, 298, 416); if (S.bosses.gloomfang) for (let i = 0; i < 2; i++) { const x = 230 + i * 30, sw = World.windSway(x, .5); pPoly(OLC, [[x - 1, 404], [x + 13, 404], [x + 14 + sw, 416], [x - 2 + sw, 416]]); pPoly('#8a8a96', [[x, 405], [x + 12, 405], [x + 13 + sw, 415], [x - 1 + sw, 415]]); P('#b0b0bc', x + 2, 406, 6, 1); } });
     // animals
-    for (const ch of this.chickens) if (ch.x > vx0 - 20 && ch.x < vx1 + 20 && ch.y > vy0 - 10 && ch.y < vy1 + 30) add(ch.y, () => this.drawChicken(ch));
-    add(this.cat.y, () => this.drawCat());
+    for (const ch of this.chickens) if (ch.x > vx0 - 20 && ch.x < vx1 + 20 && ch.y > vy0 - 10 && ch.y < vy1 + 30) add(ch.y, () => this.drawChicken(ch), null, 0, [ch.x - 10, ch.y - 22, 20, 26], HI_SMALL);
+    add(this.cat.y, () => this.drawCat(), null, 0, [this.cat.x - 14, this.cat.y - 22, 28, 26], HI_SMALL);
     for (const cr of this.crows) add(cr.fly ? 9999 : cr.y + 1, () => this.drawCrow(cr));
     // villagers
-    for (const v of this.vill) { if (!v.vis || v.x < vx0 - 40 || v.x > vx1 + 40 || v.y < vy0 - 10 || v.y > vy1 + 80) continue; add(v.y, () => this.drawVillager(v, t)); }
+    for (const v of this.vill) { if (!v.vis || v.x < vx0 - 40 || v.x > vx1 + 40 || v.y < vy0 - 10 || v.y > vy1 + 80) continue; add(v.y, () => this.drawVillager(v, t), null, 0, [v.x - 38, v.y - 66, 76, 74], HI_CHAR); }
     // player
     add(p.y + .1, () => {
       const low = S.hp / Stats.maxHP() < .3; const pl = playerLook({ t, face: this.pdir, walk: this.moving ? this.walkPh : null, low, expr: low ? 'tired' : (World.rain > .6 ? 'annoyed' : (Dialog.speaker === S.name && Dialog.talking ? 'neutral' : undefined)), talking: Dialog.speaker === S.name && Dialog.talking, sq: this.stopSettle > 0 ? 1 - this.stopSettle * .3 : 1 });
       if (this.idleT > 6) pl.look = Math.sin(T * .6) > 0 ? 1 : -1;
       drawChar(p.x, p.y, pl);
-    });
+    }, null, 0, [p.x - 38, p.y - 66, 76, 74], HI_CHAR);
+    if (typeof Life !== 'undefined') Life.villageProps(add, t, hd, this);
     L.sort((a, b) => a[0] - b[0]);
     const later = [];
-    if (hd) { for (const [y, fn, key, ver, rect] of L) { if (key === true) fn(); else if (y >= 9000) later.push(fn); else HD.capture(y, fn, key, ver, rect); } }
+    if (hd) { for (const [y, fn, key, ver, rect, o] of L) { if (key === true) fn(); else if (y >= 9000) later.push(fn); else HD.capture(y, fn, key, ver, rect, o); } }
     else for (const [, fn] of L) fn();
     // windows (lit at night) + stained glass, drawn over the cached building art (HD: baked into the building billboards)
     if (!hd) this.drawWindows(t, nk);
@@ -433,6 +437,7 @@ Scenes.village = { hd: true,
     if (wl > .05) { for (const [x, y] of this.windowLights()) L2(x, y, 40, '#ffb050', wl * .9, .08); L2(467, 346, 70, '#ffc060', wl, .12); L2(1120, 200, 50, '#ffc060', wl * .8, .1); L2(B.cath.x + 92, B.cath.y - B.cath.wallH + 16, 40, '#e060a0', wl * .7); for (const f of this.fireflies) L2(f.x + Math.sin(T * .5 + f.p) * 20, f.y, 10, '#c0ff60', nk * .5); }
     L2(PALI - 14, 448, 60, '#ff9040', .5 + wl * .5, .2); L2(PALI - 14, 518, 60, '#ff9040', .5 + wl * .5, .2);
     L2(B.smith.x + 30, B.smith.y - 14, 70, '#ff7a30', .8, .25); if (World.lightning > 0) L2(Cam.x, Cam.y, 600, '#ffffff', World.lightning);
+    if (typeof Life !== 'undefined') Life.villageLights(L2, nk);
     Light.apply();
     if (hd) { HD.screenLayer(); c = ctx; }
     Weather.fog(World.fog, '#c8d4e0', Cam.x); c.setTransform(1, 0, 0, 1, 0, 0);

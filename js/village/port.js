@@ -91,11 +91,11 @@ Scenes.port = { hd: true, timeRuns: true,
     ];
     const statics = [[A.tav, 230, 206], [A.shop, 440, 206], [A.board, 338, 222], [A.sign, 96, 354], [A.dummy, 380, 334], [A.crate, 186, 306], [A.crate, 500, 300], [A.lamp, 150, 240], [A.lamp, 500, 238], [m2Boat(1), 70, 220]];
     if (hd) {
-      HD.begin({ pitch: 30, fov: 36, zs: 'auto', tx: Cam.x, ty: Cam.y - 20, zoom: 1.12, maxBack: 400, clear: [.2, .4, .6], fog: [600, 1200, .3], fogC: nk > .5 ? [.1, .12, .26] : [.75, .85, .95], cloud: .18, dof: [.16, .2, .92, .9], bloom: [.66, .45], vig: .45 });
+      HD.begin({ water: HD.waterMask('port', [-200, -300, PW + 400, PH + 300], (x, y) => y < 186 && !(x > 518 && x < 602 && y > 148) && !(x > 28 && x < 102 && y > 198), [.2, .4, .6]), pitch: 30, fov: 36, zs: 'auto', tx: Cam.x, ty: Cam.y - 20, zoom: 1.12, maxBack: 400, clear: [.2, .4, .6], fog: [600, 1200, .3], fogC: nk > .5 ? [.1, .12, .26] : [.75, .85, .95], cloud: .18, dof: [.16, .2, .92, .9], bloom: [.66, .45], vig: .45, shafts: sunShafts({ base: .5, y: -70 }), motes: { n: 60, rise: 2.4 } });
       HD.ground(m2SeaTile(), -800, -900, { w: PW + 1600, h: 900, rep: true }); HD.ground(portGround(), 0, 0);
       HD.layer('decal'); for (let i = 0; i < 30; i++) { const x = (i * 53 + t * 6) % 640, y = 20 + (i * 37) % 160; if (Math.sin(t * 2 + i) > .4) P('#c8e8ff', x, y, 4, 1); } if (this.hov) { ctx.globalAlpha = .5 + Math.sin(t * 6) * .2; ctx.strokeStyle = '#fff4c0'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(this.hov.x, this.hov.y, this.hov.r * .7, this.hov.r * .35, 0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; } HD.groundLayer('decal');
       const L = []; for (const [a, x, y] of statics) L.push([y, () => HD.art(a.c, x - a.bx, y - a.by + (a === statics[9][0] ? Math.sin(t * 1.4) : 0), y)]);
-      for (const [x, y, fn] of figs) L.push([y + .5, () => HD.capture(y + 2, fn, null, 0, [x - 40, y - 60, 80, 66])]);
+      for (const [x, y, fn] of figs) L.push([y + .5, () => HD.capture(y + 2, fn, null, 0, [x - 40, y - 60, 80, 66], HI_CHAR)]);
       for (let k = 0; k < 4; k++) { const cl = owCloud(k), cx = ((k * 211 + t * 6) % 900) - 150; L.push([-40, () => HD.art(cl.c, cx - cl.bx, -60, -20, { alpha: .7, unlit: true, scale: 1.4 })]); }
       L.sort((a, b) => a[0] - b[0]); for (const [, f] of L) f();
       HD.layer('top'); Particles.draw(false); HD.groundLayer('top');

@@ -1,5 +1,48 @@
 # Changelog
 
+## v4.0 — "Octopath pass" (HD-2D look, hand-keyed animation, Break & Boost, Travellers, a living world)
+**Honest note:** all art is still drawn in code. It's styled after HD-2D, but it isn't hand-painted Octopath-quality pixel art. Commissioned sprite sheets would be the next big jump (see README → "What v4 is not").
+
+**Part 1 — HD-2D rendering** (`render/hd.js`, `render/pixel.js`, `render/style.js`, new `render/motes.js`)
+- Characters and small props are captured at 2× internal resolution (pixel primitives snap to ½ px), then lit per pixel by the 8 strongest nearby point lights, with soft cast shadows stretched away from the light.
+- **Reflections fixed:** mirrored sprites used to be camera-leaning cards seen almost edge-on, so reflections vanished. They're now upright mirrored cards with a depth fade and a water tint. Also fixed: a capture cache bug that hid the bridge's south railing.
+- **Post FX (HIGH only):** heat shimmer (forge, Midnight Flame field, fire spells, fireballs) and light shafts (radial march through the blur buffer plus soft god-ray bands that follow the time of day).
+- **Dust motes / pollen / embers** in the village, port, both overworlds and every combat arena, with per-area presets (HIGH + MEDIUM).
+- Flags: `Settings.postFX = false`, `Settings.motes = false`.
+
+**Part 2 — Animation v2** (new `characters/anim.js`, new `scenes/animlab.js`)
+- 8-key walk cycle (contact / down / passing / up), 4-frame breathing idle, 3-frame (sometimes double) blinks, head follow-through.
+- Combat anticipation, strike and follow-through poses with squash and stretch.
+- Secondary motion: capes, long hair, scarf ends and robe hems are small Verlet chains with inertia, gravity and wind.
+- `index.html?animlab` (or Model Sheet → FRAMES) shows every key frame, plus live cape/hair/robe actors and WIND and ANIM v2/LEGACY toggles. `Settings.anim = false` restores the old sine animation.
+
+**Part 3 — Break & Boost combat** (new `combat/boost.js`, small edit in `combat/draw.js`)
+- Every foe has a **shield count** (2–7) and hidden **weaknesses** (class types). Weaknesses show as **?** until you hit them, and they're remembered per enemy.
+- A weakness hit chips 1 shield (more if boosted). A **PERFECT** on any hit chips 1, so timing still matters. At 0 the foe is **BROKEN**: it loses its next turn, takes ×1.5 damage, and any charged BIG BUMMER is cancelled. Shields refill after that.
+- **Boost Points:** you start with 1 BP and gain +1 per turn (but not on a turn you boosted), up to 5. Spend up to 3 on Attack, Skill, Job or Break for ×(1 + 0.6 per BP) damage and extra shield chips. Use the BOOST button or **[B]**.
+- **Secondary job:** unlocks at Lv 5 or after the first boss. It adds a 6th card, JOB, which is a strike in that class's style and minigame (×1.2, 3 mana), plus a small passive bonus.
+- HUD: a shield/weakness strip under the intent box, a shield badge over the foe, a BREAK splash, and BP pips next to the Break meter.
+
+**Part 4 — Travellers & Path Actions** (new `data/travellers.js`, new `systems/travellers.js`)
+- **TRAVEL** button (village, port, both maps) opens the journal. You, Sister Pell, Sir Honkington, Lucien and Brendan (after his rival fight) each have a page.
+- **Chapters:** each companion has 3 chapters (Lv 8 / 14 / 20) with their own story card and rewards. The hero's chapters are the main story.
+- **Battle lead:** any traveller can lead normal battles. They fight with their own class and look (Honk fights as a goose), and the assist steps aside if it's the same person.
+- **Path Actions** on 10 townsfolk (8 in Placenta Creek, Bev and Marnie at the port): **Inquire** (you: chance-based, and a failure costs reputation; Pell: level-gated and always works), **Steal** (Honk: chance per item, each item once), **Challenge** (Brendan duels them alone), **Provoke** (Lucien fights their champion alone).
+- 5 new side quests unlocked by Inquire, tracked in the normal quest log.
+- **Reputation** per town (3 hearts). At 0, nobody in that town will let you use path actions until you make amends (50 coins).
+- Traveller and path battles never touch area clears, bosses, map reveals or Sigh Shards. Losing one sends you back to town with no fee.
+
+**Part 5 — A living world** (new `world/life.js`, 4 one-line hooks in `village/village.js`)
+- **Schedules:** townsfolk gather and chat at the plaza at lunch (11:30–13:30) and in the evening (17:30–20:20). The merchant is open 7 AM–8 PM and the smith 6 AM–7 PM. Closed shops have a sign and a locked-door message.
+- **Ambient life:** a sparrow flock that scatters when you walk close, flags in the wind (gate, plaza, cathedral), a plaza lantern string that lights up at dusk, a festival crowd with confetti after Barnaby, a second cat on the cathedral steps, and merchant chimney smoke.
+- **Weather:** new **SNOW** (falling flakes, ground cover that builds up and melts, footprints), ground mist in fog, and road puddles that reflect when it rains (HIGH).
+- **Chatter:** speech-bubble barks that change after every boss, plus one-time first-chat lines per villager after big events. Bev, Marnie, Lucien and Pell chatter at the port.
+
+**Other**
+- Service worker cache bumped to `bummer-v4`. All new files are registered in `js/_order.txt`, `index.html` and `sw.js`.
+- Saves stay compatible: v4 data lives in `S.trav` and is created the first time it's needed (no migration step).
+- Tested headless at HIGH and LOW: village (day/lunch/night/rain/snow/fog), port, both overworlds, combat (normal, boss, raid, Act II, break/boost, job card, traveller leads, chapter win), journal, path menus, gallery, animlab, title and interiors, with **0 console errors**. All 825 death combinations in `?deathlab` were re-run with 0 errors.
+
 ## v3.1 — Finishers ×3 and mobile
 - **15 weapon finishers:** every enemy (Act I, Act II, side bosses and bosses) now has 3 deaths per weapon class. They adapt to blood colour and body family, bosses get slow-mo boss cuts, and the same variant doesn't repeat back to back. Added the `?deathlab` previewer. All 825 enemy × weapon × variant combinations were run headless with 0 errors.
 - **Mobile/tablet:** touch-sized hit-boxes, TAP wording, full-screen + landscape lock, portrait card, viewport/safe-area fit, audio pause in the background, save on close, and phones start on MEDIUM graphics.
