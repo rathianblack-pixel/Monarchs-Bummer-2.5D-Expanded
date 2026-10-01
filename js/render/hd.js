@@ -133,7 +133,7 @@ const HD = {
   texFor(cv, dyn, rep) {
     const gl = this.gl; let e = this.texs.get(cv);
     if (!e) { e = { t: this.mkTex(1, 1, null), w: 0, h: 0, f: -1 }; this.texs.set(cv, e); dyn = true; if (rep) { gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); } }
-    if ((dyn && e.f !== this.frameN) || e.w !== cv.width || e.h !== cv.height) { gl.bindTexture(gl.TEXTURE_2D, e.t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv); e.w = cv.width; e.h = cv.height; e.f = this.frameN; e.t._tw = 1 / cv.width; e.t._th = 1 / cv.height; }
+    if ((dyn && e.f !== this.frameN) || e.w !== cv.width || e.h !== cv.height) { gl.bindTexture(gl.TEXTURE_2D, e.t); if (e.w === cv.width && e.h === cv.height) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, cv); else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv); e.w = cv.width; e.h = cv.height; e.f = this.frameN; e.t._tw = 1 / cv.width; e.t._th = 1 / cv.height; }
     return e;
   },
   // ---------------- bounds-tracking capture context ----------------
@@ -175,7 +175,7 @@ const HD = {
     if (!this.cfg.dist) this.cfg.dist = (CONFIG.LH / 2) / Math.tan(this.cfg.fov * Math.PI / 360);
     if (this.cfg.zs === 'auto') this.cfg.zs = 1 / Math.sin(this.cfg.pitch * Math.PI / 180);
     this.setCam(); this.calcView();
-    this.quads.length = 0; this.nq = 0; this.lights.length = 0; this.refl = []; this.shadows = []; this.firstBill = -1; this.deferTo = null; this.water = this.cfg.water || null; this.Q = Gfx.level >= 2 && Settings.hiSprites !== false ? 2 : 1; this.tint = null; this.planeL = null; this.amb = [255, 255, 255]; this.useLight = false; this.dark = 0;
+    this.quads.length = 0; this.nq = 0; this.lights.length = 0; this.refl = []; this.shadows = []; this.firstBill = -1; this.deferTo = null; this.water = this.cfg.water || null; this.Q = Gfx.level >= 2 && Settings.hiSprites !== false && Gfx.trim < 2 ? 2 : 1; this.tint = null; this.planeL = null; this.amb = [255, 255, 255]; this.useLight = false; this.dark = 0;
     for (const s of this.strips) { s.x = 0; s.y = 0; s.h = 0; s.used = false; }
     const sx = this.scrx; sx.setTransform(1, 0, 0, 1, 0, 0); sx.clearRect(0, 0, CONFIG.LW, CONFIG.LH); sx.globalAlpha = 1; sx.globalCompositeOperation = 'source-over';
   },
@@ -324,7 +324,7 @@ const HD = {
   // ---------------- render ----------------
   render() {
     const gl = this.gl, k = this.cfg, post = Gfx.level >= 2;
-    const want = post ? [1280, 720] : [960, 540]; if (this.RW !== want[0]) this.resize(want[0], want[1]);
+    const want = post && Gfx.trim < 3 ? (Gfx.trim ? [1120, 630] : [1280, 720]) : [960, 540]; if (this.RW !== want[0]) this.resize(want[0], want[1]);
     for (const s of this.strips) if (s.used) { const e = this.texFor(s.c, true); s.tex = e.t; }
     if (this.useLight) this.buildLightMap();
     // fill vertex buffer
@@ -366,7 +366,7 @@ const HD = {
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, post ? this.fbo.b.t : this.fbo.s.t); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.fbo.s.t);
     const d = k.dof; gl.uniform4f(pp.u.uDof, d[0], d[1], post ? d[2] : 0, d[3]); gl.uniform2f(pp.u.uBloom, k.bloom[0], post ? k.bloom[1] : 0); gl.uniform1f(pp.u.uGrade, 1); gl.uniform1f(pp.u.uVig, k.vig);
     // post FX (HIGH only): heat shimmer + light shafts.  cfg.shimmer = [amt, x0, y0, x1, y1] in low-res screen px; cfg.shafts = [strength, sunX, sunY, [r,g,b], decay]
-    const fx = post && Settings.postFX !== false, sm = fx && k.shimmer, sf = fx && k.shafts; gl.uniform1f(pp.u.uPT, T % 1000);
+    const fx = post && Settings.postFX !== false, sm = fx && k.shimmer, sf = fx && Gfx.trim < 1 && k.shafts; gl.uniform1f(pp.u.uPT, T % 1000);
     if (sm) { gl.uniform1f(pp.u.uShimA, sm[0]); gl.uniform4f(pp.u.uShimR, sm[1] / CONFIG.LW, 1 - sm[4] / CONFIG.LH, sm[3] / CONFIG.LW, 1 - sm[2] / CONFIG.LH); } else gl.uniform1f(pp.u.uShimA, 0);
     if (sf && sf[0] > .01) { const cc = sf[3] || [1, .9, .7]; gl.uniform4f(pp.u.uSh, sf[0], sf[1] / CONFIG.LW, 1 - sf[2] / CONFIG.LH, sf[4] || .9); gl.uniform3f(pp.u.uShC, cc[0], cc[1], cc[2]); } else gl.uniform4f(pp.u.uSh, 0, 0, 0, 0);
     fsq();

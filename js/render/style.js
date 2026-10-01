@@ -9,7 +9,24 @@
    ========================================================= */
 const SpriteFX = {
   on: true, depth: 0, bufs: {},
-  buf(w, h) { const k = w + 'x' + h; let b = this.bufs[k]; if (!b) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingEnabled = false; b = this.bufs[k] = { c, x }; } return b; },
+  buf(w, h) { const k = w + 'x' + h; let b = this.bufs[k]; if (!b) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingEnabled = false; b = this.bufs[k] = { c, x }; this.track(x); } return b; },
+  // perf: remember the device-pixel bounds of everything drawn into a scratch buffer, so the
+  // read-back + shading pass only touches the figure itself instead of the whole (mostly empty) buffer
+  bb: { on: false, x0: 0, y0: 0, x1: 0, y1: 0 },
+  track(x) {
+    const P2 = CanvasRenderingContext2D.prototype, b = this.bb; let dirty = true, m = null;
+    for (const k of ['setTransform', 'translate', 'scale', 'rotate', 'transform', 'resetTransform', 'restore']) x[k] = function () { dirty = true; return P2[k].apply(this, arguments); };
+    const tr = (X, Y, W, H) => {
+      if (!b.on) return; if (dirty) { m = P2.getTransform.call(x); dirty = false; }
+      let x0, y0, x1, y1;
+      if (m.b === 0 && m.c === 0) { x0 = m.a * X + m.e; x1 = m.a * (X + W) + m.e; y0 = m.d * Y + m.f; y1 = m.d * (Y + H) + m.f; if (x0 > x1) { const t = x0; x0 = x1; x1 = t; } if (y0 > y1) { const t = y0; y0 = y1; y1 = t; } }
+      else { const xs = [X, X + W, X, X + W], ys = [Y, Y, Y + H, Y + H]; x0 = y0 = 1e9; x1 = y1 = -1e9; for (let i = 0; i < 4; i++) { const px = m.a * xs[i] + m.c * ys[i] + m.e, py = m.b * xs[i] + m.d * ys[i] + m.f; if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py; } }
+      if (x0 < b.x0) b.x0 = x0; if (y0 < b.y0) b.y0 = y0; if (x1 > b.x1) b.x1 = x1; if (y1 > b.y1) b.y1 = y1;
+    };
+    x.fillRect = function (X, Y, W, H) { tr(X, Y, W, H); return P2.fillRect.call(this, X, Y, W, H); };
+    x.drawImage = function (img, a, b2, c, d, e, f, g, h) { const n = arguments.length; if (n === 3) tr(a, b2, img.width, img.height); else if (n === 5) tr(a, b2, c, d); else tr(e, f, g, h); return P2.drawImage.apply(this, arguments); };
+    for (const k of ['fill', 'stroke', 'fillText', 'strokeText', 'putImageData', 'clearRect']) x[k] = function () { if (b.on && k !== 'clearRect') { b.x0 = 0; b.y0 = 0; b.x1 = 1e9; b.y1 = 1e9; } return P2[k].apply(this, arguments); };
+  },
   // draw fn() (which draws around the origin at x,y) through the shading pass
   wrap(x, y, s, fn) {
     if (!this.on || this.depth > 0 || PAINT) { this.depth++; try { fn(x, y); } finally { this.depth--; } return; }
@@ -17,12 +34,19 @@ const SpriteFX = {
     const Wl = Math.min(900, Math.ceil(150 * s / 8) * 8), Hl = Math.min(900, Math.ceil(160 * s / 8) * 8), ox = Wl / 2, oy = Math.round(Hl * .78), W = Wl * q, H = Hl * q;
     const b = this.buf(W, H), bx = b.x; bx.setTransform(1, 0, 0, 1, 0, 0); bx.globalAlpha = 1; bx.globalCompositeOperation = 'source-over'; bx.clearRect(0, 0, W, H); bx.setTransform(q, 0, 0, q, 0, 0); bx._q = q;
     const prev = useCtx(bx); const rx = Math.round(x * q) / q, ry = Math.round(y * q) / q, fx = x - rx, fy = y - ry;
-    this.depth++; try { fn(ox + fx, oy + fy); } finally { this.depth--; useCtx(prev); }
-    bx.setTransform(1, 0, 0, 1, 0, 0); this.shade(bx, W, H, q);
-    if (q > 1) ctx.drawImage(b.c, rx - ox, ry - oy, Wl, Hl); else ctx.drawImage(b.c, Math.round(x) - ox, Math.round(y) - oy);
+    const bb = this.bb, was = bb.on; bb.on = true; bb.x0 = 1e9; bb.y0 = 1e9; bb.x1 = -1e9; bb.y1 = -1e9;
+    this.depth++; try { fn(ox + fx, oy + fy); } finally { this.depth--; useCtx(prev); bb.on = was; }
+    bx.setTransform(1, 0, 0, 1, 0, 0);
+    if (!(bb.x1 > bb.x0)) return; // nothing drawn
+    // shade only the drawn region (+ a margin for the outline / shadow taps)
+    const pad = 3 * q, X0 = Math.max(0, Math.floor(bb.x0) - pad), Y0 = Math.max(0, Math.floor(bb.y0) - pad), X1 = Math.min(W, Math.ceil(bb.x1) + pad), Y1 = Math.min(H, Math.ceil(bb.y1) + pad), RW = X1 - X0, RH = Y1 - Y0;
+    if (RW <= 0 || RH <= 0) return;
+    this.shade(bx, RW, RH, q, X0, Y0);
+    const lx = X0 / q, ly = Y0 / q, lw = RW / q, lh = RH / q;
+    if (q > 1) ctx.drawImage(b.c, X0, Y0, RW, RH, rx - ox + lx, ry - oy + ly, lw, lh); else ctx.drawImage(b.c, X0, Y0, RW, RH, Math.round(x) - ox + X0, Math.round(y) - oy + Y0, RW, RH);
   },
-  shade(bx, W, H, q = 1) {
-    const id = bx.getImageData(0, 0, W, H), d = id.data, n = W * H;
+  shade(bx, W, H, q = 1, RX = 0, RY = 0) {
+    const id = bx.getImageData(RX, RY, W, H), d = id.data, n = W * H;
     // bounds
     let x0 = W, y0 = H, x1 = -1, y1 = -1;
     const u = new Uint32Array(d.buffer, d.byteOffset, n);
@@ -51,7 +75,7 @@ const SpriteFX = {
       else if (sh2) { r = r * .84 + 3; g = g * .84 + 1; b = b * .88 + 9; }
       d[p] = r; d[p + 1] = g; d[p + 2] = b;
     }
-    bx.putImageData(id, 0, 0);
+    bx.putImageData(id, RX, RY);
   }
 };
 // wrap the character + monster renderers
@@ -142,19 +166,35 @@ const Gfx = {
     SpriteFX.on = this.level >= 1; Grade.on = this.level >= 1;
     Particles.budget = this.level >= 2 ? 250 : this.level === 1 ? 160 : 90;
   },
-  cycle() { const order = ['auto', 'high', 'medium', 'low'], m = order[(order.indexOf(this.mode()) + 1) % order.length]; Settings.gfx = m; if (m === 'auto') this.level = 2; this.warm = 0; this.apply(); saveSettings(); },
-  label() { const m = this.mode(); return m === 'auto' ? 'AUTO (' + this.names[this.level] + ')' : m.toUpperCase(); },
+  cycle() { const order = ['auto', 'high', 'medium', 'low'], m = order[(order.indexOf(this.mode()) + 1) % order.length]; Settings.gfx = m; this.trim = 0; if (m === 'auto') this.level = 2; this.warm = 0; this.apply(); saveSettings(); },
+  label() { const m = this.mode(), t = this.level >= 2 && this.trim ? ' -' + this.trim : ''; return m === 'auto' ? 'AUTO (' + this.names[this.level] + t + ')' : m.toUpperCase() + t; },
+  // ---- adaptive HIGH ("trim") ----
+  // HIGH keeps its look but, if the real frame rate stays low, quietly trims the most expensive
+  // GPU/CPU work one step at a time:  1 = no light shafts + slightly lower 3D render res,
+  // 2 = 1x (not 2x) character captures,  3 = 960x540 3D render.  It never drops you to MEDIUM.
+  trim: 0, tAcc: 0, tN: 0, tSlow: 0, tWarm: 0,
+  trimTick(dt) {
+    if (this.level < 2 || Settings.adaptiveHigh === false || document.hidden || !HD.live) { this.tAcc = 0; this.tN = 0; this.tWarm = 0; return; }
+    if (Scene.transitioning) { this.tWarm = 0; return; }
+    this.tWarm += dt; if (this.tWarm < 2.5) { this.tAcc = 0; this.tN = 0; return; }
+    this.tAcc += dt; this.tN++; if (this.tAcc < 1.5) return;
+    const avg = this.tAcc / this.tN; this.tAcc = 0; this.tN = 0;
+    if (avg > 1 / 50 && this.trim < 3) { if (++this.tSlow >= 2) { this.tSlow = 0; this.trim++; this.tWarm = 1.5; if (!this.tToast) { this.tToast = 1; Toast.add('HIGH: trimming heavy effects to stay smooth', COL.gold2, '⚙'); } } }
+    else this.tSlow = 0; // (no automatic step back up: avoids see-sawing; re-pick HIGH in Settings to reset)
+  },
   // called once per frame with the real frame interval
   tick(dt) {
+    this.trimTick(dt);
     if (this.mode() !== 'auto' || document.hidden) return;
     if (Scene.transitioning) { this.warm = 0; return; }
     this.warm += dt; if (this.warm < 3) { this.acc = 0; this.n = 0; return; } // ignore loading hitches
     this.acc += dt; this.n++;
     if (this.acc >= 2) { const avg = this.acc / this.n; this.acc = 0; this.n = 0;
-      if (avg > 1 / 42 && this.level > 0) { this.slow++; if (this.slow >= 2) { this.level--; this.slow = 0; this.warm = 0; this.apply(); Toast.add('Graphics set to ' + this.names[this.level] + ' for smoother play', COL.gold2, '⚙'); } }
+      if (avg > 1 / 42 && this.level > 0 && (this.level < 2 || this.trim >= 3 || Settings.adaptiveHigh === false)) { this.slow++; if (this.slow >= 2) { this.level--; this.slow = 0; this.warm = 0; this.apply(); Toast.add('Graphics set to ' + this.names[this.level] + ' for smoother play', COL.gold2, '⚙'); } }
       else this.slow = 0; }
   }
 };
-// background villagers skip the shading pass below HIGH
+// background villagers skip the CPU shading pass below HIGH, and on HIGH-HD too (the GPU lit-sprite
+// shader already gives them form light, rim and outline - doing both was the biggest per-frame CPU cost)
 SpriteFX.minor = false;
-(function () { const w = SpriteFX.wrap; SpriteFX.wrap = function (x, y, s, fn) { if (this.minor && Gfx.level < 2) { this.depth++; try { fn(x, y); } finally { this.depth--; } return; } return w.call(this, x, y, s, fn); }; })();
+(function () { const w = SpriteFX.wrap; SpriteFX.wrap = function (x, y, s, fn) { if (this.minor && (Gfx.level < 2 || (HD.on && HD.Q > 1 && Settings.litSprites !== false))) { this.depth++; try { fn(x, y); } finally { this.depth--; } return; } return w.call(this, x, y, s, fn); }; })();

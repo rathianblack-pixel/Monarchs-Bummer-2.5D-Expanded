@@ -70,4 +70,5 @@ Settings → **Graphics**: AUTO (default) / HIGH / MEDIUM / LOW.
 - MEDIUM: 2.5D at lower internal resolution without depth of field/bloom/shafts/shimmer, fewer motes, shading only on the hero and combatants, fewer particles.
 - LOW: the classic flat 2D renderer, no sprite shading or colour grade, half particles.
 Interiors, the road, title and cutscenes are always 2D.
-- AUTO starts on HIGH and steps down if the frame rate stays below ~42 fps.
+- HIGH is adaptive: if it can't hold ~50 fps, it trims light shafts, sprite resolution and then 3D render resolution, one step at a time (the label shows `HIGH -1/-2/-3`). It never drops to MEDIUM. Use `Settings.adaptiveHigh = false` to turn this off.
+- AUTO starts on HIGH, trims the same way, and only then steps down if the frame rate stays below ~42 fps.

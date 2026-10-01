@@ -1,5 +1,13 @@
 # Changelog
 
+## v4.0.1 — HIGH performance fix
+v4's HIGH setting was under-optimised: it did about 3× the per-frame CPU work of v3.1's HIGH.
+- **Sprite shading only processes the figure.** The CPU light/outline pass read back and shaded each character's whole scratch buffer, which is mostly empty and 4× bigger since 2× sprites arrived. It now tracks what was drawn and only touches that area, about 16× fewer pixels.
+- **No double-lighting on background figures.** On HIGH, villagers, the festival crowd and other minor figures skip the CPU shading pass. The GPU lit-sprite shader already gives them light, rim and outline. The hero, party and combatants keep both.
+- **Adaptive HIGH.** If HIGH can't hold ~50 fps, it trims one step at a time instead of stuttering: 1) no light shafts and a 1120×630 3D render, 2) 1× character captures, 3) a 960×540 3D render. It never drops you to MEDIUM. Re-pick HIGH in Settings to reset it. Turn it off with `Settings.adaptiveHigh = false`. The Graphics label shows `HIGH -1/-2/-3` when it has trimmed.
+- Dynamic textures are re-uploaded in place (`texSubImage2D`) instead of being reallocated every frame.
+- Measured on the same machine, village HIGH: per-frame draw work went from 34.7 ms to 17.8 ms (sprite shading 14.5 ms → 1.2 ms). Combat HIGH: 9.8 ms → 7.5 ms. Visuals are unchanged apart from slightly softer rim light on background villagers.
+
 ## v4.0 — "Octopath pass" (HD-2D look, hand-keyed animation, Break & Boost, Travellers, a living world)
 **Honest note:** all art is still drawn in code. It's styled after HD-2D, but it isn't hand-painted Octopath-quality pixel art. Commissioned sprite sheets would be the next big jump (see README → "What v4 is not").
 
