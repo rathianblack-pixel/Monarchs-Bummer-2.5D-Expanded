@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.5.1 — Village lag
+The village was still slow on HIGH and MEDIUM because of CPU work, not the GPU. Every villager was fully redrawn and shaded every frame, along with the hammering smith, the festival bunting and the stall awning.
+- **Villagers** (`HD.frameSprite`): each villager keeps its last drawing and moves it along with them. Only 2 villagers get a fresh drawing per frame (`CONFIG.VILLAGER_REDRAWS`), and any villager whose pose changes (turns, sits, waves, starts walking, talks to you) is redrawn right away. Animation steps at 10 fps while walking and 6 fps idle, which is the usual pixel-art rate. Time loops every 8 s, so the HD character cache can reuse frames. The cache was also raised from 320 to 640 entries.
+- **Smithy:** the anvil and weapon rack are cached once, and the hammering smith is 16 cached frames. Only the forge glow is drawn live.
+- **Festival bunting and stall awning:** cached and redrawn 6–8 times per second instead of every frame.
+- **Renderer:** cached art no longer reads pixels back each time an animated prop is re-captured. Reading back only happens on a key's first capture.
+- **Measured** (village, festival, simulated 60 fps): CPU spent drawing the scene went from 8.5 ms to about 5–7 ms per frame. Character shading went from 2.1 ms to 0.6 ms, and from about 2 cache misses per frame to 0.4. This helps HIGH and MEDIUM equally.
+
+## v4.5 — Lighter HD renderer
+HIGH looks the same but does much less work per frame. Everything is in `js/render/hd.js`; scenes didn't need changes.
+- **Ground planes drawn in 64 px cells:** empty cells are skipped, and the tiled forest/sea under a map is no longer drawn where an opaque map covers it. Fully opaque cells are drawn without blending. This mostly helps the overworld: its 5 fog banks × 3 heights, lava and decal layers were up to 15 full-map transparent planes. Overdraw went from 9.9× to 2.8× the screen.
+- **Per-frame layers (decals, particles, the combat action plane):** the renderer tracks which cells were painted (rects, images, and now path bounds for `fill`/`stroke`). Only those cells are drawn, only their bounding box is uploaded, and only that area is cleared next frame. Combat texture uploads dropped from 11.8 MB to 2.9 MB per frame.
+- **Big art billboards** (buildings, trees, skies, light rays) skip their empty cells too.
+- **Light shafts** are now computed at quarter resolution in their own pass, not with 16 samples per full-res pixel.
+- **The UI vignette and the screen overlay** (motes, framing) are composited inside the final GPU pass. That removes two full-screen 2D blends per frame. The WebGL canvas no longer uses `preserveDrawingBuffer`, which avoids an extra frame copy on real GPUs.
+- **Light map** reduced from 512×320 to 256×160. It's smooth and filtered, so the lighting looks the same.
+- **Measured** (headless Chromium with a software GPU, 1280×720 HIGH, ms per frame, before → after): village day 767 → 307 (2.5×), village night 641 → 346 (1.85×), overworld 1777 → 421 (4.2×), battle 731 → 310 (2.4×), Port Mopeway 652 → 315 (2.1×). On a software GPU, fixed full-screen costs dominate. Real GPUs should gain at least as much, because the removed work (overdraw, uploads, shaft samples) is a bigger share of their frame.
+- **Optional:** `CONFIG.HD_SCALE` (default 1) renders HD at a lower resolution for weak GPUs, e.g. `.8` = 1024×576. The image is slightly softer.
+- **Toggle:** `Settings.sparseGround = false` turns off the cell culling, for comparison.
+
 ## v4.4 — Weather everywhere, scarier monsters
 **Weather**
 - **Interiors:** no more rain falling inside rooms. The house window still shows the rain outside, and indoor rain sounds stay muffled.

@@ -1,6 +1,6 @@
 // Service worker: caches the whole game so it runs offline once installed.
 // Bump VERSION whenever you ship an update so phones fetch the new files.
-const VERSION = 'bummer-v4.4';
+const VERSION = 'bummer-v4.5.1';
 const FILES = [
  "./",
  "index.html",

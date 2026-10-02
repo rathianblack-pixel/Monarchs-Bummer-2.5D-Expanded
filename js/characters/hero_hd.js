@@ -436,7 +436,7 @@ const HeroHD = {
     this.begin(s, face); this.R.tb = t; P.s = s; P.t = tq === null ? t : tq; P.tb = t; this.rig(o, P); this.shadeAll(PAINT);
     const R = this.R, b = R.b; e = { ox: R.ox, oy: R.oy };
     // reuse an evicted canvas when possible
-    let c = null; if (this.cache.size >= 320) { const [k0, e0] = this.cache.entries().next().value; this.cache.delete(k0); if (e0.c.width === b.W && e0.c.height === b.H) c = e0.c; }
+    let c = null; if (this.cache.size >= 640) { const [k0, e0] = this.cache.entries().next().value; this.cache.delete(k0); if (e0.c.width === b.W && e0.c.height === b.H) c = e0.c; }
     if (!c) { c = document.createElement('canvas'); c.width = b.W; c.height = b.H; }
     const x = c.getContext('2d'); const id = x.createImageData(b.W, b.H); id.data.set(b.O); x.putImageData(id, 0, 0);
     e.c = c; this.cache.set(k, e); this.stats.ms += performance.now() - t0; return e;

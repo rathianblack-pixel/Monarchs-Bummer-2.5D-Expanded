@@ -383,10 +383,12 @@ Scenes.village = { hd: true,
     add(338, () => { const x = 356, y = 338; for (let yy = 0; yy < 3; yy++) for (let i = 0; i < 4 - yy; i++) { const lx = x + i * 7 + yy * 3, ly = y - 3 - yy * 5; pCirc(OLC, lx, ly, 3.5); pCirc('#c08450', lx, ly, 2.5); P('#8a5a34', lx, ly, 1, 1); } }, 'wood');
     add(350, () => { tdBarrel(196, 350); tdCrate(212, 352, 12, 9); }, 'bar1');
     // merchant stall + awning (in front of the shop, right side)
-    add(372, () => this.drawStall(t));
+    add(372, () => this.drawStall(t), hd ? 'stall' : null, Math.floor(t * 8)); // perf: cached, re-drawn 8x per second
     add(330 + 30, () => { tdCrate(612, 350); tdCrate(626, 352, 10, 8); tdBarrel(604, 360); }, 'crt1');
     // smithy yard: anvil, rack, barrels, coal
-    add(B.smith.y + 20, () => this.drawSmithYard(t, night));
+    if (hd) { const sy = B.smith.y + 20; add(sy, () => this.drawSmithYard(t, night, 'static'), 'syard'); add(sy, () => this.drawSmithYard(t, night, 'glow'));
+      if (!night) { const fi = Math.floor((T % 1.6) / 1.6 * 16); add(sy + .01, () => this.drawSmithYard(fi / 16 * 1.6, night, 'smith'), 'ssmith' + fi); } } // perf: the hammering smith is 16 cached frames
+    else add(B.smith.y + 20, () => this.drawSmithYard(t, night));
     add(B.smith.y + 10, () => { tdBarrel(B.smith.x - 8, B.smith.y + 10); tdBarrel(B.smith.x + 4, B.smith.y + 14); }, 'sbar');
     // signpost at crossroads
     add(462, () => { const x = 1088, y = 462; tdShadowRect(x, y - 1, 8, 3); P(OLC, x - 1, y - 30, 4, 31); P('#9a6440', x, y - 29, 2, 29); P(OLC, x - 16, y - 32, 30, 10); P('#d8a868', x - 15, y - 31, 28, 8); P('#8a5a34', x - 12, y - 28, 22, 1); P('#8a5a34', x - 12, y - 26, 16, 1); pPoly(OLC, [[x + 14, y - 32], [x + 19, y - 27], [x + 14, y - 22]]); }, 'sign');
@@ -399,7 +401,7 @@ Scenes.village = { hd: true,
     // field fences
     for (let f = 0; f < 3; f++) { const fx = 220 + f * 330; add(560, () => tdFenceH(fx, fx + 230, 558), 'ffa' + f); add(652, () => tdFenceH(fx, fx + 230, 652), 'ffb' + f); }
     // festival bunting (after Barnaby) strung across the plaza
-    if (S.bosses.barnaby) add(406, () => this.drawFestival(t));
+    if (S.bosses.barnaby) add(406, () => this.drawFestival(t), hd ? 'fest' : null, Math.floor(t * 6)); // perf: the bunting barely moves; re-drawn 6x per second
     // wolf pelts on the garden fence (after Gloomfang)
     add(416, () => { tdFenceH(214, 298, 416); if (S.bosses.gloomfang) for (let i = 0; i < 2; i++) { const x = 230 + i * 30, sw = World.windSway(x, .5); pPoly(OLC, [[x - 1, 404], [x + 13, 404], [x + 14 + sw, 416], [x - 2 + sw, 416]]); pPoly('#8a8a96', [[x, 405], [x + 12, 405], [x + 13 + sw, 415], [x - 1 + sw, 415]]); P('#b0b0bc', x + 2, 406, 6, 1); } });
     // animals
@@ -407,7 +409,9 @@ Scenes.village = { hd: true,
     add(this.cat.y, () => this.drawCat(), null, 0, [this.cat.x - 14, this.cat.y - 22, 28, 26], HI_SMALL);
     for (const cr of this.crows) add(cr.fly ? 9999 : cr.y + 1, () => this.drawCrow(cr));
     // villagers
-    for (const v of this.vill) { if (!v.vis || v.x < vx0 - 40 || v.x > vx1 + 40 || v.y < vy0 - 10 || v.y > vy1 + 80) continue; add(v.y, () => this.drawVillager(v, t), null, 0, [v.x - 38, v.y - 66, 76, 74], HI_CHAR); }
+    const vs = this.vill.filter(v => v.vis && !(v.x < vx0 - 40 || v.x > vx1 + 40 || v.y < vy0 - 10 || v.y > vy1 + 80));
+    if (hd) this.pickVillagerRedraws(vs);
+    vs.forEach((v) => { if (hd) add(v.y, () => HD.frameSprite('vil' + this.vill.indexOf(v), v._fv, Math.round(v.x), Math.round(v.y), v.y, () => this.drawVillager(v, (Math.floor(T * 6) % 48) / 6), [-38, -66, 76, 74], HI_CHAR), true); else add(v.y, () => this.drawVillager(v, t)); });
     // player
     add(p.y + .1, () => {
       const low = S.hp / Stats.maxHP() < .3; const pl = playerLook({ t, face: this.pdir, walk: this.moving ? this.walkPh : null, low, expr: low ? 'tired' : (World.rain > .6 ? 'annoyed' : (Dialog.speaker === S.name && Dialog.talking ? 'neutral' : undefined)), talking: Dialog.speaker === S.name && Dialog.talking, sq: this.stopSettle > 0 ? 1 - this.stopSettle * .3 : 1 });
@@ -466,13 +470,16 @@ Scenes.village = { hd: true,
     for (let i = 0; i < 10; i++) { const xx = x + 2 + i * 6, sw = Math.sin(t * 2 + i * .5) * World.wind; pPoly(OLC, [[xx - 1, y - 46], [xx + 7, y - 46], [xx + 7 + sw, y - 36], [xx - 1 + sw, y - 36]]); pPoly(i % 2 ? '#e84a5a' : '#fff4e0', [[xx, y - 45], [xx + 6, y - 45], [xx + 6 + sw, y - 37], [xx + sw, y - 37]]); pEll(i % 2 ? '#e84a5a' : '#fff4e0', xx + 3 + sw, y - 37, 3, 2); }
     P(OLC, x, y - 47, 62, 2);
   },
-  drawSmithYard(t, night) {
+  drawSmithYard(t, night, part) {
     const sx = B.smith.x, y = B.smith.y + 20, ax = sx + 150;
+    if (part === 'smith') { const hk = t / 1.6, arm = hk < .7 ? lerp(.2, -2.4, hk / .7) : lerp(-2.4, 1.2, (hk - .7) / .3); drawChar(ax + 16, y + 2, { skin: '#c8885a', hairStyle: 'bald', beard: '#3a2a1a', top: '#7a6a5a', apron: '#4a3a2a', pants: '#3a3030', boots: '#2a2020', weapon: 'hammer', armF: arm, face: -1, body: 'round', seed: 30, t, s: .95 }); P('#ff8030', ax - 4, y - 15, 6, 2); return; }
+    if (part === 'glow') { const fg = .7 + .3 * noise1(t * 6), fx = sx + 20, fy = B.smith.y - 24; P(mix('#8a2a08', '#ffb040', fg), fx, fy, 18, 12); P(mix('#e06010', '#fff0a0', fg), fx + 4, fy + 3, 10, 6); return; }
     // anvil
     tdShadowRect(ax - 8, y - 1, 18, 3); pPoly(OLC, [[ax - 12, y - 14], [ax + 10, y - 14], [ax + 6, y - 9], [ax + 3, y - 9], [ax + 5, y], [ax - 7, y], [ax - 5, y - 9], [ax - 8, y - 9]]); P('#6a6a7a', ax - 11, y - 13, 20, 3); P('#b0b0c0', ax - 11, y - 13, 20, 1);
     // weapon rack
     const rx = sx + 104; P(OLC, rx - 1, y - 30, 34, 3); for (let i = 0; i < 4; i++) { pLine(OLC, rx + 4 + i * 8, y - 28, rx + 4 + i * 8, y - 4, 3); pLine(i % 2 ? '#c0c8d0' : '#e0e8f0', rx + 4 + i * 8, y - 27, rx + 4 + i * 8, y - 8, 1); P('#7a4a2e', rx + 3 + i * 8, y - 6, 3, 4); } P(OLC, rx - 1, y - 2, 34, 3);
     // forge glow in the open bay
+    if (part === 'static') return;
     const fg = .7 + .3 * noise1(t * 6), fx = sx + 20, fy = B.smith.y - 24; P(mix('#8a2a08', '#ffb040', fg), fx, fy, 18, 12); P(mix('#e06010', '#fff0a0', fg), fx + 4, fy + 3, 10, 6);
     if (!night) { const hk = (T % 1.6) / 1.6, arm = hk < .7 ? lerp(.2, -2.4, hk / .7) : lerp(-2.4, 1.2, (hk - .7) / .3); drawChar(ax + 16, y + 2, { skin: '#c8885a', hairStyle: 'bald', beard: '#3a2a1a', top: '#7a6a5a', apron: '#4a3a2a', pants: '#3a3030', boots: '#2a2020', weapon: 'hammer', armF: arm, face: -1, body: 'round', seed: 30, t, s: .95 }); P('#ff8030', ax - 4, y - 15, 6, 2); }
   },
@@ -514,17 +521,28 @@ Scenes.village = { hd: true,
     c.restore();
   },
   drawCrow(cr) { const fl = cr.fly ? (Math.sin(T * 25) > 0 ? -2 : 1) : 0; P('#0e0a14', cr.x - 3, cr.y - 3, 6, 3); P('#0e0a14', cr.x + 2, cr.y - 5, 3, 3); P('#4a3a5a', cr.x - 2, cr.y - 3, 3, 1); P('#f0a020', cr.x + 5, cr.y - 4, 2, 1); if (cr.fly) { P('#0e0a14', cr.x - 6, cr.y - 3 + fl, 4, 1); P('#0e0a14', cr.x + 2, cr.y - 3 + fl, 4, 1); } else { P('#0e0a14', cr.x - 5, cr.y - 2, 2, 1); } },
+  // perf: villagers are full procedural characters (~1 ms each at 2x).  In HD each one is re-drawn only every few frames
+  // (round-robin, CONFIG.VILLAGER_REDRAWS per frame) and whenever its pose changes; in between its last image moves with it.
+  pickVillagerRedraws(vs) {
+    const K = CONFIG.VILLAGER_REDRAWS || 2, rain = World.rain > .5; let n = 0; const rest = [];
+    for (const v of vs) { v._age = (v._age || 0) + 1; if (v._fv === undefined) v._fv = 0;
+      const sig = (v.dir > 0 ? 1 : 0) + '|' + v.state + '|' + !!v.seated + '|' + (v.wave > 0) + '|' + rain + '|' + (v.bub > 0) + '|' + !!v.walk;
+      const talk = Dialog.open && Dialog.speaker && (Dialog.speaker === v.look?.name || v.state === 'TALK_P');
+      const tq = Math.floor(T * (v.walk ? 10 : 6)); // animation steps: 10 fps walking, 6 fps idle (pixel-art rate)
+      if (sig !== v._sig || talk || v.wave > 0) { v._sig = sig; v._fv++; v._age = 0; v._tq = tq; n++; } else if (tq !== v._tq) rest.push(v); }
+    rest.sort((a, b) => b._age - a._age); for (const v of rest) { if (n >= K) break; v._fv++; v._age = 0; v._tq = Math.floor(T * (v.walk ? 10 : 6)); n++; }
+  },
   drawVillager(v, t) {
     const talkingNow = Dialog.open && Dialog.speaker && (Dialog.speaker === v.look?.name || (v.state === 'TALK_P' && Dialog.talking));
-    const o = Object.assign({}, v.look, { t, face: v.dir, walk: v.walk, talking: talkingNow || (v.state === 'TALK' && Math.sin(T * 3 + v.x) > 0), expr: v.state === 'TALK' ? 'happy' : v.state === 'LOOK' ? 'neutral' : undefined });
+    const o = Object.assign({}, v.look, { t, face: v.dir, walk: v.walk, talking: talkingNow || (v.state === 'TALK' && Math.sin(t * 3 + v.x) > 0), expr: v.state === 'TALK' ? 'happy' : v.state === 'LOOK' ? 'neutral' : undefined });
     if (v.state === 'SIT' && v.seated) o.sit = true;
-    if (v.state === 'WORK') { o.armF = -.3 + Math.sin(T * 4) * .9; o.wAng = o.armF + 2.8; }
-    if (v.state === 'FISH') { o.weapon = 'spear'; o.armF = -.9; o.wAng = .9 + Math.sin(T * .8) * .05; }
-    if (v.wave > 0) { o.armF = Math.PI + .4 + Math.sin(T * 14) * .3; o.expr = 'happy'; }
+    if (v.state === 'WORK') { o.armF = -.3 + Math.sin(t * 4) * .9; o.wAng = o.armF + 2.8; }
+    if (v.state === 'FISH') { o.weapon = 'spear'; o.armF = -.9; o.wAng = .9 + Math.sin(t * .8) * .05; }
+    if (v.wave > 0) { o.armF = Math.PI + .4 + Math.sin(t * 14) * .3; o.expr = 'happy'; }
     if (World.rain > .5 && !v.guard) { o.armF = Math.PI - .2; o.expr = 'annoyed'; }
     SpriteFX.minor = true; try { drawChar(v.x, v.y, o); } finally { SpriteFX.minor = false; }
-    if (v.state === 'FISH') { const ex = v.x + 22, ey = v.y - 30; pLine('#e8e0d0', ex, ey, ex + 10, v.y + 4 + Math.sin(T * 2) * 1.5, 1); P('#f04040', ex + 10, v.y + 4 + Math.sin(T * 2) * 1.5, 2, 2); }
-    if (v.bub > 0 || (v.state === 'TALK' && Math.sin(T * 2 + v.x) > .6)) { const yy = v.y; P(OLC, v.x - 4, yy - 59, 11, 9); P('#fff8e8', v.x - 3, yy - 58, 9, 7); P('#fff8e8', v.x - 1, yy - 51, 2, 2); P('#3a2a1a', v.x - 1, yy - 55, 1, 1); P('#3a2a1a', v.x + 1, yy - 55, 1, 1); P('#3a2a1a', v.x + 3, yy - 55, 1, 1); }
+    if (v.state === 'FISH') { const ex = v.x + 22, ey = v.y - 30; pLine('#e8e0d0', ex, ey, ex + 10, v.y + 4 + Math.sin(t * 2) * 1.5, 1); P('#f04040', ex + 10, v.y + 4 + Math.sin(t * 2) * 1.5, 2, 2); }
+    if (v.bub > 0 || (v.state === 'TALK' && Math.sin(t * 2 + v.x) > .6)) { const yy = v.y; P(OLC, v.x - 4, yy - 59, 11, 9); P('#fff8e8', v.x - 3, yy - 58, 9, 7); P('#fff8e8', v.x - 1, yy - 51, 2, 2); P('#3a2a1a', v.x - 1, yy - 55, 1, 1); P('#3a2a1a', v.x + 1, yy - 55, 1, 1); P('#3a2a1a', v.x + 3, yy - 55, 1, 1); }
   },
   windowDefs() { // [x, y, w, h] in world space for each window pane block
     const hw = (k, list) => { const b = B[k], yW = b.y - b.wallH; return list.map(([wx, wy, ww, wh]) => [b.x + wx, yW + wy, ww, wh]); };

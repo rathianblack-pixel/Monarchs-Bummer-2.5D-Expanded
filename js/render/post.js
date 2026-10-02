@@ -7,8 +7,8 @@ const Post = {
   init() { const [c, x] = mkCanvas(CONFIG.W, CONFIG.H); const gr = x.createRadialGradient(640, 360, 250, 640, 360, 820); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(8,4,16,.62)'); x.fillStyle = gr; x.fillRect(0, 0, CONFIG.W, CONFIG.H); this.vignette = c; },
   doFlash(a = .8, col = '#fff') { this.flash = Settings.flashes ? a : a * .3; this.flashCol = col; },
   update(dt) { this.flash = Math.max(0, this.flash - dt * 3.5); },
-  draw() {
-    g.drawImage(this.vignette, 0, 0);
+  draw(baked) {
+    if (!baked) g.drawImage(this.vignette, 0, 0); // baked: the HD renderer already applied it on the GPU
     if (this.tintA > 0.01) { g.globalAlpha = this.tintA; g.fillStyle = this.tint; g.fillRect(0, 0, CONFIG.W, CONFIG.H); g.globalAlpha = 1; }
     if (this.letter > .01) { const h = 70 * this.letter; g.fillStyle = '#000'; g.fillRect(0, 0, CONFIG.W, h); g.fillRect(0, CONFIG.H - h, CONFIG.W, h); }
   },

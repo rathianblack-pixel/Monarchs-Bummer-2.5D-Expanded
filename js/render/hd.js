@@ -20,7 +20,7 @@ const HD = {
     if (this.ok || this.failed) return this.ok;
     try {
       const c = document.createElement('canvas'); c.width = this.RW; c.height = this.RH;
-      const gl = c.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
+      const gl = c.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
       if (!gl) throw new Error('no webgl');
       this.c = c; this.gl = gl;
       const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
@@ -80,7 +80,7 @@ const HD = {
       this.bp = prog(fsq, `precision mediump float; varying vec2 uv; uniform sampler2D uT; uniform vec2 uD;
         void main(){ vec4 s = texture2D(uT, uv) * .227027; s += texture2D(uT, uv + uD * 1.3846) * .3162162; s += texture2D(uT, uv - uD * 1.3846) * .3162162; s += texture2D(uT, uv + uD * 3.2308) * .0702703; s += texture2D(uT, uv - uD * 3.2308) * .0702703; gl_FragColor = s; }`, ['aP']);
       this.pp = prog(fsq, `precision mediump float; varying vec2 uv; uniform sampler2D uS; uniform sampler2D uB; uniform vec4 uDof; uniform vec2 uBloom; uniform float uGrade; uniform float uVig;
-        uniform vec4 uShimR; uniform float uShimA; uniform float uPT; uniform vec4 uSh; uniform vec3 uShC;
+        uniform vec4 uShimR; uniform float uShimA; uniform float uPT; uniform vec4 uSh; uniform vec3 uShC; uniform sampler2D uA; uniform float uPV; uniform sampler2D uScr; uniform float uScrOn;
         float sc(float v){ v = clamp(v, 0., 1.); return v + (v - .5) * (1. - abs(v - .5) * 2.) * .14; }
         float hh(float x){ return fract(sin(x * 91.7) * 43758.55); }
         float n1(float x){ float i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(hh(i), hh(i + 1.), f); }
@@ -97,13 +97,22 @@ const HD = {
             c = l + (c - l) * k; float s = pow(1. - clamp(l, 0., 1.), 2.2) * .22, hh = pow(clamp(l, 0., 1.), 2.4) * .10;
             c += (vec3(.20, .12, .34) - c) * s; c.r += (1. - c.r) * hh; c.g += (.94 - c.g) * hh; c.b += (.80 - c.b) * hh * .6; c = vec3(sc(c.r), sc(c.g), sc(c.b)); }
           // light shafts: radial march from the light through the blurred buffer (occluders cut real gaps), plus soft procedural god-ray bands
-          if (uSh.x > 0.) { vec2 sp = uSh.yz, dv = (uv - sp) * (1. / 16.), p = uv; float acc = 0., w = 1.;
+          if (uSh.x > 0.) c += uShC * texture2D(uA, uv).rgb; // light shafts, computed at quarter res (perf)
+          vec2 q = uv - .5; c *= 1. - dot(q, q) * uVig;
+          if (uScrOn > 0.) { vec4 o = texture2D(uScr, vec2(uv.x, 1. - uv.y)); c = mix(c, o.rgb, o.a); } // the 2D screen overlay (motes, framing), composited here (perf)
+          if (uPV > 0.) { vec2 pq = q * vec2(1280., 720.); c = mix(c, vec3(.0314, .0157, .0627), .62 * uPV * clamp((length(pq) - 250.) / 570., 0., 1.)); } // the UI-res 2D vignette, baked in here (perf: saves a full-screen 2D blend)
+          gl_FragColor = vec4(c, 1.); }`, ['aP']);
+      // light shafts at quarter res: radial march from the light through the blurred buffer (occluders cut real gaps), plus soft procedural god-ray bands
+      this.shp = prog(fsq, `precision mediump float; varying vec2 uv; uniform sampler2D uB; uniform vec4 uSh; uniform float uPT;
+        float hh(float x){ return fract(sin(x * 91.7) * 43758.55); }
+        float n1(float x){ float i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(hh(i), hh(i + 1.), f); }
+        void main(){ vec3 c = vec3(0.); vec3 uShC = vec3(1.);
+          { vec2 sp = uSh.yz, dv = (uv - sp) * (1. / 16.), p = uv; float acc = 0., w = 1.;
             for (int i = 0; i < 16; i++) { p -= dv; vec3 s = texture2D(uB, clamp(p, .001, .999)).rgb; acc += max(dot(s, vec3(.3, .59, .11)) - .5, 0.) * w; w *= uSh.w; }
             vec2 d = uv - sp; float ang = atan(d.y, d.x), dist = length(d * vec2(1.78, 1.));
             float bands = pow(n1(ang * 26. + uPT * .08), 3.) * .7 + pow(n1(ang * 61. - uPT * .05), 4.) * .5;
             float fall = (1. - smoothstep(.15, 1.45, dist));
             c += uShC * (acc * .075 + bands * .22 * fall) * uSh.x * (.35 + .65 * fall); }
-          vec2 q = uv - .5; c *= 1. - dot(q, q) * uVig;
           gl_FragColor = vec4(c, 1.); }`, ['aP']);
       // buffers
       this.MAXQ = 12000; this.VS = 14; this.vf = new Float32Array(this.MAXQ * 4 * this.VS); this.vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.vb); gl.bufferData(gl.ARRAY_BUFFER, this.vf.byteLength, gl.DYNAMIC_DRAW);
@@ -119,7 +128,7 @@ const HD = {
       // 2D helper canvases
       const mk = (w, h) => { const cc = document.createElement('canvas'); cc.width = w; cc.height = h; const x = cc.getContext('2d'); x.imageSmoothingEnabled = false; return [cc, x]; };
       this.mk = mk; [this.cap, this.capx] = mk(1200, 820); this.instrument(this.capx);
-      [this.lc, this.lx] = mk(512, 320); [this.scr, this.scrx] = mk(CONFIG.LW, CONFIG.LH);
+      [this.lc, this.lx] = mk(256, 160); [this.scr, this.scrx] = mk(CONFIG.LW, CONFIG.LH); this.scrT = this.instrument(this.scrx, { on: true, x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 }); // perf: the light map is smooth and linearly filtered; 256x160 is plenty
       this.layers = {};
       c.addEventListener('webglcontextlost', e => { e.preventDefault(); this.failed = true; this.ok = false; });
       this.ok = true;
@@ -137,21 +146,51 @@ const HD = {
     return e;
   },
   // ---------------- bounds-tracking capture context ----------------
-  instrument(x) {
-    const P2 = CanvasRenderingContext2D.prototype, self = this; let dirty = true, m = null;
+  // bounds-tracking 2D context.  T = tracker {on, x0,y0,x1,y1 (device px), cells?: Uint8Array grid of CS-px cells, cw, ch}
+  // perf: knowing exactly which parts of a canvas were drawn lets captures stay small and lets layers emit/upload only their painted cells
+  instrument(x, T) {
+    const P2 = CanvasRenderingContext2D.prototype; let dirty = true, m = null; T = T || (this.bb = { on: false, x0: 0, y0: 0, x1: 0, y1: 0 }); x._T = T;
     for (const k of ['setTransform', 'translate', 'scale', 'rotate', 'transform', 'resetTransform', 'restore']) x[k] = function () { dirty = true; return P2[k].apply(this, arguments); };
+    const M = () => { if (dirty) { m = P2.getTransform.call(x); dirty = false; } return m; };
+    const mark = (x0, y0, x1, y1) => {
+      if (x0 < T.x0) T.x0 = x0; if (y0 < T.y0) T.y0 = y0; if (x1 > T.x1) T.x1 = x1; if (y1 > T.y1) T.y1 = y1;
+      const C = T.cells; if (!C) return; const cs = HD.CS, i0 = Math.max(0, Math.floor((x0 - 2) / cs)), j0 = Math.max(0, Math.floor((y0 - 2) / cs)), i1 = Math.min(T.cw - 1, Math.floor((x1 + 2) / cs)), j1 = Math.min(T.ch - 1, Math.floor((y1 + 2) / cs));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) C[j * T.cw + i] = 1;
+    };
+    const all = () => mark(0, 0, x.canvas.width, x.canvas.height);
     const tr = (X, Y, W, H) => {
-      const b = self.bb; if (!b.on) return; if (dirty) { m = P2.getTransform.call(x); dirty = false; }
-      let x0, y0, x1, y1;
+      if (!T.on) return; const m = M(); let x0, y0, x1, y1;
       if (m.b === 0 && m.c === 0) { x0 = m.a * X + m.e; x1 = m.a * (X + W) + m.e; y0 = m.d * Y + m.f; y1 = m.d * (Y + H) + m.f; if (x0 > x1) { const t = x0; x0 = x1; x1 = t; } if (y0 > y1) { const t = y0; y0 = y1; y1 = t; } }
       else { const xs = [X, X + W, X, X + W], ys = [Y, Y, Y + H, Y + H]; x0 = y0 = 1e9; x1 = y1 = -1e9; for (let i = 0; i < 4; i++) { const px = m.a * xs[i] + m.c * ys[i] + m.e, py = m.b * xs[i] + m.d * ys[i] + m.f; if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py; } }
-      if (x0 < b.x0) b.x0 = x0; if (y0 < b.y0) b.y0 = y0; if (x1 > b.x1) b.x1 = x1; if (y1 > b.y1) b.y1 = y1;
+      if (x1 < 0 || y1 < 0 || x0 > x.canvas.width || y0 > x.canvas.height) return; mark(x0, y0, x1, y1);
     };
+    // current path bounds (device px), so fill()/stroke() mark only what they touch
+    const pb = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9, bad: false };
+    const pt = (X, Y, r) => { const m = M(); r = r || 0; const s = r ? Math.max(Math.hypot(m.a, m.b), Math.hypot(m.c, m.d)) * r : 0, px = m.a * X + m.c * Y + m.e, py = m.b * X + m.d * Y + m.f; if (px - s < pb.x0) pb.x0 = px - s; if (py - s < pb.y0) pb.y0 = py - s; if (px + s > pb.x1) pb.x1 = px + s; if (py + s > pb.y1) pb.y1 = py + s; };
+    x.beginPath = function () { pb.x0 = pb.y0 = 1e9; pb.x1 = pb.y1 = -1e9; pb.bad = false; return P2.beginPath.call(this); };
+    x.moveTo = function (a, b) { if (T.on) pt(a, b); return P2.moveTo.call(this, a, b); };
+    x.lineTo = function (a, b) { if (T.on) pt(a, b); return P2.lineTo.call(this, a, b); };
+    x.quadraticCurveTo = function (a, b, c, d) { if (T.on) { pt(a, b); pt(c, d); } return P2.quadraticCurveTo.apply(this, arguments); };
+    x.bezierCurveTo = function (a, b, c, d, e, f) { if (T.on) { pt(a, b); pt(c, d); pt(e, f); } return P2.bezierCurveTo.apply(this, arguments); };
+    x.arcTo = function (a, b, c, d, r) { if (T.on) { pt(a, b, r); pt(c, d, r); } return P2.arcTo.apply(this, arguments); };
+    x.rect = function (a, b, c, d) { if (T.on) { pt(a, b); pt(a + c, b + d); pt(a + c, b); pt(a, b + d); } return P2.rect.apply(this, arguments); };
+    if (P2.roundRect) x.roundRect = function (a, b, c, d) { if (T.on) { pt(a, b); pt(a + c, b + d); pt(a + c, b); pt(a, b + d); } return P2.roundRect.apply(this, arguments); };
+    x.arc = function (a, b, r) { if (T.on) pt(a, b, Math.abs(r)); return P2.arc.apply(this, arguments); };
+    x.ellipse = function (a, b, rx, ry) { if (T.on) pt(a, b, Math.max(Math.abs(rx), Math.abs(ry))); return P2.ellipse.apply(this, arguments); };
+    x.closePath = function () { return P2.closePath.call(this); };
+    const pathMark = (pad) => { if (!T.on) return; if (pb.bad || pb.x1 < pb.x0) { if (pb.bad) all(); return; } const x0 = pb.x0 - pad, y0 = pb.y0 - pad, x1 = pb.x1 + pad, y1 = pb.y1 + pad; if (x1 < 0 || y1 < 0 || x0 > x.canvas.width || y0 > x.canvas.height) return; mark(Math.max(0, x0), Math.max(0, y0), Math.min(x.canvas.width, x1), Math.min(x.canvas.height, y1)); };
+    x.fill = function (p) { if (T.on) { if (p && typeof p === 'object') all(); else pathMark(2); } return P2.fill.apply(this, arguments); };
+    x.stroke = function (p) { if (T.on) { if (p && typeof p === 'object') all(); else { const m = M(); pathMark(this.lineWidth * Math.max(Math.hypot(m.a, m.b), Math.hypot(m.c, m.d)) + (this.lineJoin === 'miter' ? this.lineWidth * this.miterLimit : 0) + 3); } } return P2.stroke.apply(this, arguments); };
     x.fillRect = function (X, Y, W, H) { tr(X, Y, W, H); return P2.fillRect.call(this, X, Y, W, H); };
+    x.strokeRect = function (X, Y, W, H) { const l = this.lineWidth + 1; tr(X - l, Y - l, W + l * 2, H + l * 2); return P2.strokeRect.call(this, X, Y, W, H); };
     x.drawImage = function (img, a, b, c, d, e, f, g, h) { const n = arguments.length; if (n === 3) tr(a, b, img.width, img.height); else if (n === 5) tr(a, b, c, d); else tr(e, f, g, h); return P2.drawImage.apply(this, arguments); };
-    for (const k of ['fill', 'stroke', 'fillText', 'strokeText', 'putImageData']) x[k] = function () { const b = self.bb; if (b.on) { b.x0 = 0; b.y0 = 0; b.x1 = x.canvas.width; b.y1 = x.canvas.height; } return P2[k].apply(this, arguments); };
-    this.bb = { on: false, x0: 0, y0: 0, x1: 0, y1: 0 };
+    for (const k of ['fillText', 'strokeText', 'putImageData']) x[k] = function () { if (T.on) all(); return P2[k].apply(this, arguments); };
+    return T;
   },
+  // cell trackers for layer canvases (cells of CS device px)
+  CS: 64,
+  mkTracker(w, h) { const cw = Math.ceil(w / this.CS), ch = Math.ceil(h / this.CS); return { on: true, x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9, cells: new Uint8Array(cw * ch), cw, ch }; },
+  resetTracker(T) { T.x0 = T.y0 = 1e9; T.x1 = T.y1 = -1e9; if (T.cells) T.cells.fill(0); },
   // ---------------- camera ----------------
   setCam() {
     const k = this.cfg, D = k.dist / Math.max(.2, k.zoom || 1), th = k.pitch * Math.PI / 180, ya = (k.yaw || 0) * Math.PI / 180;
@@ -167,7 +206,7 @@ const HD = {
   // low-res screen -> 2D world point on the ground
   unproject(sx, sy) { const nx = (sx / CONFIG.LW) * 2 - 1, ny = 1 - (sy / CONFIG.LH) * 2, t = this.tanH, a = this.asp; const d = [this.f[0] + this.r[0] * nx * t * a + this.u[0] * ny * t, this.f[1] + this.r[1] * nx * t * a + this.u[1] * ny * t, this.f[2] + this.r[2] * nx * t * a + this.u[2] * ny * t]; if (d[1] > -1e-4) d[1] = -1e-4; const s = -this.C[1] / d[1]; return [this.C[0] + d[0] * s, (this.C[2] + d[2] * s) / this.cfg.zs]; },
   // 2D rect of ground visible on screen (for culling + layer canvases)
-  calcView() { const pts = [[0, 0], [CONFIG.LW, 0], [0, CONFIG.LH], [CONFIG.LW, CONFIG.LH], [CONFIG.LW / 2, 0]].map(([a, b]) => this.unproject(a, b)); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } const k = this.cfg; y0 = Math.max(y0, k.ty - (k.maxBack || 700)); x0 = Math.max(x0, k.tx - 520); x1 = Math.min(x1, k.tx + 520); this.view = { x0: Math.floor(x0), y0: Math.floor(y0), x1: Math.ceil(x1), y1: Math.ceil(y1) }; },
+  calcView() { const pts = [[0, 0], [CONFIG.LW, 0], [0, CONFIG.LH], [CONFIG.LW, CONFIG.LH], [CONFIG.LW / 2, 0]].map(([a, b]) => this.unproject(a, b)); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } this.viewU = { x0, y0, x1, y1 }; const k = this.cfg; y0 = Math.max(y0, k.ty - (k.maxBack || 700)); x0 = Math.max(x0, k.tx - 520); x1 = Math.min(x1, k.tx + 520); this.view = { x0: Math.floor(x0), y0: Math.floor(y0), x1: Math.ceil(x1), y1: Math.ceil(y1) }; },
   // ---------------- frame API ----------------
   begin(cfg) {
     this.frameN = (this.frameN || 0) + 1; this.on = true;
@@ -177,29 +216,95 @@ const HD = {
     this.setCam(); this.calcView();
     this.quads.length = 0; this.nq = 0; this.reb = 0; this.lights.length = 0; this.refl = []; this.shadows = []; this.firstBill = -1; this.deferTo = null; this.water = this.cfg.water || null; this.Q = Gfx.level >= 2 && Settings.hiSprites !== false && Gfx.trim < 2 ? 2 : 1; this.tint = null; this.planeL = null; this.amb = [255, 255, 255]; this.useLight = false; this.dark = 0;
     for (const s of this.strips) { s.x = 0; s.y = 0; s.h = 0; s.used = false; }
-    const sx = this.scrx; sx.setTransform(1, 0, 0, 1, 0, 0); sx.clearRect(0, 0, CONFIG.LW, CONFIG.LH); sx.globalAlpha = 1; sx.globalCompositeOperation = 'source-over';
+    const sx = this.scrx; sx.setTransform(1, 0, 0, 1, 0, 0); if (this.scrUsed()) sx.clearRect(0, 0, CONFIG.LW, CONFIG.LH); this.resetTracker(this.scrT); sx.globalAlpha = 1; sx.globalCompositeOperation = 'source-over';
   },
   // a 2D canvas covering the visible ground; draw into it in world coords
   layer(name, opts = {}) {
     const v = this.view, w = Math.min(1100, v.x1 - v.x0 + 16), h = Math.min(640, v.y1 - v.y0 + 16); let L = this.layers[name];
     const bw = Math.ceil(w / 64) * 64, bh = Math.ceil(h / 64) * 64;
-    const q = opts.q || 1; if (!L || L.c.width !== bw * q || L.c.height !== bh * q) { const [c, x] = this.mk(bw * q, bh * q); L = this.layers[name] = { c, x }; } L.q = q; L.x._q = q;
+    const q = opts.q || 1; if (!L || L.c.width !== bw * q || L.c.height !== bh * q) { const [c, x] = this.mk(bw * q, bh * q); L = this.layers[name] = { c, x, T: null }; c._L = L; L.T = this.instrument(x, this.mkTracker(c.width, c.height)); L.T.x0 = 0; L.T.y0 = 0; L.T.x1 = c.width; L.T.y1 = c.height; } L.q = q; L.x._q = q;
     L.ox = opts.ox !== undefined ? opts.ox : v.x0 - 8; L.oy = opts.oy !== undefined ? opts.oy : v.y0 - 8; L.w = opts.w || w; L.h = opts.h || h;
-    const x = L.x; x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, L.c.width, L.c.height); x.setTransform(q, 0, 0, q, -L.ox * q, -L.oy * q);
+    const x = L.x, T = L.T; x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+    if (T.x1 > T.x0) { const x0 = Math.max(0, Math.floor(T.x0) - 4), y0 = Math.max(0, Math.floor(T.y0) - 4); x.clearRect(x0, y0, Math.min(L.c.width, Math.ceil(T.x1) + 4) - x0, Math.min(L.c.height, Math.ceil(T.y1) + 4) - y0); } // perf: clear only what was painted last frame
+    this.resetTracker(T); L.f = this.frameN; x.setTransform(q, 0, 0, q, -L.ox * q, -L.oy * q);
     useCtx(x); return L;
   },
+  // perf: a layer's painted cells -> a texture holding just their bounding box (small upload) + the list of painted cells
+  layerTex(L) {
+    const T = L.T, CS = this.CS; if (L.uf === this.frameN && L.ut) return L.ut;
+    let n = 0; for (let i = 0; i < T.cells.length; i++) n += T.cells[i]; if (!n) return (L.uf = this.frameN, L.ut = { n: 0 });
+    let i0 = 1e9, j0 = 1e9, i1 = -1, j1 = -1; for (let j = 0; j < T.ch; j++) for (let i = 0; i < T.cw; i++) if (T.cells[j * T.cw + i]) { if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    const bx = i0 * CS, by = j0 * CS, bw = Math.min(L.c.width, (i1 + 1) * CS) - bx, bh = Math.min(L.c.height, (j1 + 1) * CS) - by; let cv = L.c, e;
+    if (bw * bh < L.c.width * L.c.height * .6) { const tw = Math.ceil(bw / 128) * 128, th = Math.ceil(bh / 128) * 128; if (!L.tc || L.tc.width !== tw || L.tc.height !== th) { [L.tc, L.tx] = this.mk(tw, th); } L.tx.clearRect(0, 0, tw, th); L.tx.drawImage(L.c, bx, by, bw, bh, 0, 0, bw, bh); cv = L.tc; e = this.texFor(cv, true); L.ut = { n, e, bx, by, cv }; }
+    else { e = this.texFor(cv, true); L.ut = { n, e, bx: 0, by: 0, cv }; }
+    L.uf = this.frameN; return L.ut;
+  },
+  scrUsed() { return this.scrT.x1 > this.scrT.x0; }, // perf: main.js skips the full-screen overlay blit when nothing was drawn on it
   screenLayer() { const x = this.scrx; x.setTransform(1, 0, 0, 1, 0, 0); useCtx(x); return x; },
   // ---- quad emitters ----
   pushQ(tex, P4, uv, W4, col, X) { if (this.nq >= this.MAXQ) return; const qd = { tex, P4, uv, W4, col, X: X || HD.X0 }; if (this.deferTo) this.deferTo.push(qd); else this.quads.push(qd); this.nq++; },
+  // ground planes are emitted as 64px cells: empty cells are skipped and (for tiled fills) cells hidden under a later opaque ground are culled.  perf: fog/lava/decal planes are mostly empty, the tiled forest under the village is mostly hidden
   ground(cv, x, y, o = {}) { const e = this.texFor(cv, o.dyn, o.rep), w = o.w || cv.width, h = o.h || cv.height, zs = this.cfg.zs, yy = (o.lift || 0); const sw = o.sw || (o.rep ? w : cv.width), sh = o.sh || (o.rep ? h : cv.height), u0 = (o.sx || 0) / e.w, v0 = (o.sy || 0) / e.h, u1 = ((o.sx || 0) + sw) / e.w, v1 = ((o.sy || 0) + sh) / e.h;
-    this.pushQ(e.t, [x, yy, y * zs, x + w, yy, y * zs, x, yy, (y + h) * zs, x + w, yy, (y + h) * zs], [u0, v0, u1, v0, u0, v1, u1, v1], [x, y, x + w, y, x, y + h, x + w, y + h], o.col || (this.tint ? [this.tint[0], this.tint[1], this.tint[2], o.alpha === undefined ? 1 : o.alpha] : [1, 1, 1, o.alpha === undefined ? 1 : o.alpha])); },
-  groundLayer(name, o = {}) { const L = this.layers[name]; if (!L) return; this.ground(L.c, L.ox, L.oy, Object.assign({ dyn: true, w: L.w, h: L.h, sw: L.w, sh: L.h }, o)); },
+    const col = o.col || (this.tint ? [this.tint[0], this.tint[1], this.tint[2], o.alpha === undefined ? 1 : o.alpha] : [1, 1, 1, o.alpha === undefined ? 1 : o.alpha]);
+    if (Settings.sparseGround !== false && (o.rep || o.cells || !o.dyn)) { const G = { e, cv, x, y, w, h, yy, u0, v0, u1, v1, col, rep: !!o.rep, cells: o.cells || null, occ: o.rep || o.cells ? null : this.occGrid(cv), sx: o.sx || 0, sy: o.sy || 0, sw, sh }; (this.deferTo || this.quads).push({ G, col }); return; }
+    this.pushQ(e.t, [x, yy, y * zs, x + w, yy, y * zs, x, yy, (y + h) * zs, x + w, yy, (y + h) * zs], [u0, v0, u1, v0, u0, v1, u1, v1], [x, y, x + w, y, x, y + h, x + w, y + h], col); },
+  groundLayer(name, o = {}) { const L = this.layers[name]; if (!L) return; if (L.f !== this.frameN) return; const U = this.layerTex(L); if (!U.n) return; const q = L.q || 1;
+    this.ground(U.cv, L.ox + U.bx / q, L.oy + U.by / q, Object.assign({ dyn: false, w: L.w - U.bx / q, h: L.h - U.by / q, sw: L.w * q - U.bx, sh: L.h * q - U.by, cells: { T: L.T, bx: U.bx, by: U.by } }, o)); },
+  // per-canvas 64px cell occupancy (any visible pixel) + opacity (every pixel opaque), read back once.  Non-dyn canvases are treated as immutable by texFor already
+  occGrid(cv) {
+    this.occ = this.occ || new WeakMap(); let G = this.occ.get(cv); if (G && G.w === cv.width && G.h === cv.height) return G;
+    G = this.occOf(cv, cv.width, cv.height); this.occ.set(cv, G); return G;
+  },
+  // any: a cell holds (or is within 8px of) a visible pixel -> must be drawn (the 8px margin keeps lit-sprite outlines); opq: every pixel opaque
+  occOf(cv, W, H) {
+    const CS = this.CS, cw = Math.ceil(W / CS), ch = Math.ceil(H / CS), any = new Uint8Array(cw * ch), opq = new Uint8Array(cw * ch), fw = Math.ceil(W / 8), fh = Math.ceil(H / 8), fine = new Uint8Array(fw * fh);
+    try { const d = cv.getContext('2d').getImageData(0, 0, W, H).data; opq.fill(1);
+      for (let y = 0; y < H; y++) { const fj = (y >> 3) * fw, cj = ((y / CS) | 0) * cw; for (let x = 0, p = y * W * 4 + 3; x < W; x++, p += 4) { const v = d[p]; if (v) fine[fj + (x >> 3)] = 1; if (v !== 255) opq[cj + ((x / CS) | 0)] = 0; } }
+      const r = CS / 8; for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) { let a = 0; for (let fy = Math.max(0, j * r - 1); fy <= Math.min(fh - 1, (j + 1) * r) && !a; fy++) for (let fx = Math.max(0, i * r - 1); fx <= Math.min(fw - 1, (i + 1) * r); fx++) if (fine[fy * fw + fx]) { a = 1; break; } any[j * cw + i] = a; }
+    } catch (err) { any.fill(1); opq.fill(0); }
+    let n = 0; for (let i = 0; i < any.length; i++) n += any[i];
+    return { w: W, h: H, cw, ch, any, opq, full: n === any.length };
+  },
+  // a billboard split into its non-empty cells (perf: big art with transparent areas — sky cut-outs, fog banks, light rays, trees)
+  billCells(tex, x, y, w, h, yb, U, G, o) {
+    if (!G || G.full || Settings.sparseGround === false || G.w < 96 && G.h < 96) return this.bill(tex, x, y, w, h, yb, [U[0], U[1], U[2], U[1], U[0], U[3], U[2], U[3]], o);
+    const CS = this.CS, flip = U[0] > U[2], sw = o.sway || 0, oo = Object.assign({}, o, { ax: x + w / 2 }), sx = w / G.w, sy = h / G.h;
+    for (let j = 0; j < G.ch; j++) for (let i = 0; i < G.cw; i++) { if (!G.any[j * G.cw + i]) continue;
+      const p0 = i * CS, p1 = Math.min(G.w, (i + 1) * CS), q0 = j * CS, q1 = Math.min(G.h, (j + 1) * CS);
+      const wx0 = flip ? x + (G.w - p1) * sx : x + p0 * sx, wx1 = flip ? x + (G.w - p0) * sx : x + p1 * sx, wy0 = y + q0 * sy, wy1 = y + q1 * sy;
+      const uL = U[0] + (flip ? p1 : p0) / G.w * (U[2] - U[0]), uR = U[0] + (flip ? p0 : p1) / G.w * (U[2] - U[0]), vT = U[1] + q0 / G.h * (U[3] - U[1]), vB = U[1] + q1 / G.h * (U[3] - U[1]);
+      oo.swy = [sw * (y + h - wy0) / h, sw * (y + h - wy1) / h];
+      this.bill(tex, wx0, wy0, wx1 - wx0, wy1 - wy0, yb, [uL, vT, uR, vT, uL, vB, uR, vB], oo); }
+  },
+  // expand a deferred ground record into cell quads (called from render, so later opaque grounds can hide tiled ones)
+  expandG(G, out, covers) {
+    const zs = this.cfg.zs, VU = this.viewU, CS = this.CS, col = G.col, X = this.X0, t = G.e.t, yy = G.yy;
+    const mg = 64 + Math.abs(yy) / Math.max(.15, Math.tan((this.cfg.pitch || 52) * Math.PI / 180)) * 1.3;
+    const vx0 = VU.x0 - mg, vy0 = VU.y0 - mg, vx1 = VU.x1 + mg, vy1 = VU.y1 + mg;
+    const ea = col[3] >= 1.5 ? col[3] - 2 : col[3], solid = ea >= .999; let opq = null; // perf: fully opaque cells are drawn without blending
+    if (solid && !G.cells) { const O = G.rep ? this.occGrid(G.cv) : G.occ; opq = G.rep ? (O.opq.every(v => v) ? 1 : 0) : O.opq; }
+    let curOp = false; const kx = G.w / G.sw, ky = G.h / G.sh, du = (G.u1 - G.u0) / G.w, dv = (G.v1 - G.v0) / G.h; // world px per canvas px, uv per world px
+    const emit = (wx0, wy0, wx1, wy1) => {
+      if (wx1 < vx0 || wx0 > vx1 || wy1 < vy0 || wy0 > vy1 || this.nq >= this.MAXQ) return;
+      if (covers) for (const c of covers) if (c.covers(wx0, wy0, wx1, wy1)) return;
+      const a0 = G.u0 + (wx0 - G.x) * du, a1 = G.u0 + (wx1 - G.x) * du, b0 = G.v0 + (wy0 - G.y) * dv, b1 = G.v0 + (wy1 - G.y) * dv;
+      out.push({ tex: t, P4: [wx0, yy, wy0 * zs, wx1, yy, wy0 * zs, wx0, yy, wy1 * zs, wx1, yy, wy1 * zs], uv: [a0, b0, a1, b0, a0, b1, a1, b1], W4: [wx0, wy0, wx1, wy0, wx0, wy1, wx1, wy1], col, X, op: curOp }); this.nq++;
+    };
+    if (G.rep) { const st = 128, x0 = Math.max(G.x, vx0), y0 = Math.max(G.y, vy0), x1 = Math.min(G.x + G.w, vx1), y1 = Math.min(G.y + G.h, vy1); const i0 = Math.floor(x0 / st), j0 = Math.floor(y0 / st);
+      for (let j = j0; j * st < y1; j++) for (let i = i0; i * st < x1; i++) { curOp = opq === 1; emit(Math.max(G.x, i * st), Math.max(G.y, j * st), Math.min(G.x + G.w, (i + 1) * st), Math.min(G.y + G.h, (j + 1) * st)); } return; }
+    // canvas cells -> world rects (cell edges computed identically for neighbours, so no cracks)
+    let cw, ch, has, ox = 0, oy = 0; if (G.cells) { const T = G.cells.T; cw = T.cw; ch = T.ch; has = T.cells; ox = G.cells.bx; oy = G.cells.by; } else { cw = G.occ.cw; ch = G.occ.ch; has = G.occ.any; }
+    const cx = (px) => G.x + (Math.min(Math.max(px - ox, 0), G.sx + G.sw) - G.sx) * kx, cy = (py) => G.y + (Math.min(Math.max(py - oy, 0), G.sy + G.sh) - G.sy) * ky;
+    const pi0 = G.cells ? Math.floor(ox / CS) : Math.floor(G.sx / CS), pj0 = G.cells ? Math.floor(oy / CS) : Math.floor(G.sy / CS);
+    const pi1 = G.cells ? cw - 1 : Math.min(cw - 1, Math.floor((G.sx + G.sw - 1) / CS)), pj1 = G.cells ? ch - 1 : Math.min(ch - 1, Math.floor((G.sy + G.sh - 1) / CS));
+    for (let j = pj0; j <= pj1; j++) for (let i = pi0; i <= pi1; i++) if (has[j * cw + i]) { curOp = !!(opq && opq[j * cw + i]); const x0 = cx(G.cells ? i * CS : Math.max(G.sx, i * CS) ), x1 = cx(G.cells ? (i + 1) * CS : Math.min(G.sx + G.sw, (i + 1) * CS)), y0 = cy(G.cells ? j * CS : Math.max(G.sy, j * CS)), y1 = cy(G.cells ? (j + 1) * CS : Math.min(G.sy + G.sh, (j + 1) * CS)); if (x1 > x0 && y1 > y0) emit(x0, y0, x1, y1); }
+  },
   // a camera-facing billboard for the 2D rect (x,y,w,h) whose row yb sits on the ground
   bill(tex, x, y, w, h, yb, uv, o = {}) {
-    const zs = this.cfg.zs, r = this.r, u = this.u, ax = x + w / 2, bz = yb * zs, sw = o.sway || 0, lean = o.lean === undefined ? 1 : o.lean;
+    const zs = this.cfg.zs, r = this.r, u = this.u, ax = o.ax !== undefined ? o.ax : x + w / 2, bz = yb * zs, sw = o.sway || 0, lean = o.lean === undefined ? 1 : o.lean;
     const U = [u[0] * lean, u[1] * lean + (1 - lean), u[2] * lean]; const ul = Math.hypot(U[0], U[1], U[2]); U[0] /= ul; U[1] /= ul; U[2] /= ul;
     const pt = (px, py, s) => { const dx = px - ax + s, hh = yb - py; return [ax + r[0] * dx + U[0] * hh, r[1] * dx + U[1] * hh, bz + r[2] * dx + U[2] * hh]; };
-    const a = pt(x, y, sw), b = pt(x + w, y, sw), c = pt(x, y + h, 0), d = pt(x + w, y + h, 0);
+    const s0 = o.swy ? o.swy[0] : sw, s1 = o.swy ? o.swy[1] : 0, a = pt(x, y, s0), b = pt(x + w, y, s0), c = pt(x, y + h, s1), d = pt(x + w, y + h, s1);
     const col = o.col ? o.col.slice() : (this.tint ? [this.tint[0], this.tint[1], this.tint[2], o.alpha === undefined ? 1 : o.alpha] : [1, 1, 1, o.alpha === undefined ? 1 : o.alpha]); if (o.unlit) col[3] += 2;
     if (this.firstBill < 0) this.firstBill = this.quads.length;
     const kind = o.plane ? 3 : o.lit ? (o.flip ? 2 : 1) : 0, X = kind || o.q ? [kind, yb, o.q || 1] : HD.X0;
@@ -208,7 +313,7 @@ const HD = {
       // mirror as an upright (not camera-leaning) card: a camera-facing billboard mirrored through y=0 is seen almost edge-on
       // (projected height ~ h*cos(2*pitch)), which is why reflections used to vanish.  Upright -> visible height h*cos(pitch).
       const rk = o.reflK || .92, mp = (px, py, s) => { const dx = px - ax + s, hh = (yb - py) * rk; return [ax + r[0] * dx, -hh, bz + r[2] * dx]; };
-      const ra = mp(x, y, sw * .6), rb = mp(x + w, y, sw * .6), rc = mp(x, y + h, 0), rd = mp(x + w, y + h, 0);
+      const ra = mp(x, y, s0 * .6), rb = mp(x + w, y, s0 * .6), rc = mp(x, y + h, s1 * .6), rd = mp(x + w, y + h, s1 * .6);
       this.refl.push({ tex, P4: [...ra, ...rb, ...rc, ...rd], uv, W4: [x, y, x + w, y, x, y + h, x + w, y + h], col: col.slice(), X: [4, yb, o.q || 1] });
     }
   },
@@ -216,14 +321,14 @@ const HD = {
   art(cv, dx, dy, yb, o = {}) {
     let e = this.artMap.get(cv); if (!e || e.gen !== this.sGen) { e = this.sAlloc(cv.width, cv.height); if (!e) return; this.gl.bindTexture(this.gl.TEXTURE_2D, this.sat); this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, e.x, e.y, this.gl.RGBA, this.gl.UNSIGNED_BYTE, cv); e.gen = this.sGen; this.artMap.set(cv, e); }
     const S = this.SA, sc = o.scale || 1; let u0 = e.x / S, u1 = (e.x + e.w) / S; if (o.flip) { const t = u0; u0 = u1; u1 = t; }
-    this.bill(this.sat, dx, dy, e.w * sc, e.h * sc, yb, [u0, e.y / S, u1, e.y / S, u0, (e.y + e.h) / S, u1, (e.y + e.h) / S], o);
+    this.billCells(this.sat, dx, dy, e.w * sc, e.h * sc, yb, [u0, e.y / S, u1, (e.y + e.h) / S], cv.width >= 96 || cv.height >= 96 ? this.occGrid(cv) : null, o);
   },
   sGen: 1,
   sAlloc(w, h) { const p = this.sPack, S = this.SA; if (w > S || h > S) return null; if (p.x + w + 4 > S) { p.x = 0; p.y += p.h + 4; p.h = 0; } if (p.y + h + 4 > S) { this.sGen++; this.sMap.clear(); p.x = 0; p.y = 0; p.h = 0; } const e = { x: p.x, y: p.y, w, h, gen: this.sGen }; p.x += w + 4; p.h = Math.max(p.h, h); return e; },
   // run fn() (which draws in 2D world coords) and turn whatever it drew into a billboard.
   // key -> cache the result in the static atlas (re-captured when ver changes); rect -> clip to a 2D rect
   capture(yb, fn, key, ver, rect, o = {}) {
-    if (key) { const s = this.sMap.get(key); if (s && s.gen === this.sGen && (s.ver === ver || (this.reb = (this.reb || 0) + 1) > CONFIG.RECAPTURES_PER_FRAME)) { if (s.w) this.bill(this.sat, s.wx, s.wy, s.w, s.h, yb, s.uv, o); return; } } // perf: when many cached art pieces change version at once (dusk/dawn), rebuild a couple per frame and show the previous version meanwhile
+    if (key) { const s = this.sMap.get(key); if (s && s.gen === this.sGen && (s.ver === ver || (this.reb = (this.reb || 0) + 1) > CONFIG.RECAPTURES_PER_FRAME)) { if (s.w) this.billCells(this.sat, s.wx, s.wy, s.w, s.h, yb, [s.uv[0], s.uv[1], s.uv[6], s.uv[7]], s.occ, o); return; } } // perf: when many cached art pieces change version at once (dusk/dawn), rebuild a couple per frame and show the previous version meanwhile
     const v = this.view, ox = rect ? Math.floor(rect[0]) - 2 : Math.max(v.x0 - 30, (this.cfg.tx | 0) - 550), oy = rect ? Math.floor(rect[1]) - 2 : v.y0 - 300, x = this.capx, b = this.bb;
     const P2 = CanvasRenderingContext2D.prototype, q = (o.hi && rect && !key && this.Q > 1 && (rect[2] + 4) * this.Q < this.cap.width && (rect[3] + 4) * this.Q < this.cap.height) ? this.Q : 1;
     if (o.hi) o = Object.assign({ lit: true }, o, { q });
@@ -243,12 +348,26 @@ const HD = {
       let s = this.sMap.get(key); if (!s || s.gen !== this.sGen || s.cw < w || s.ch < h) { const e = this.sAlloc(w, h); if (!e) { x.clearRect(X0, Y0, w, h); return; } s = { gen: this.sGen, x: e.x, y: e.y, cw: w, ch: h }; }
       const [tc, tx] = this.tmpCanvas(s.cw, s.ch); tx.clearRect(0, 0, s.cw, s.ch); tx.drawImage(this.cap, X0, Y0, w, h, 0, 0, w, h);
       const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, this.sat); gl.texSubImage2D(gl.TEXTURE_2D, 0, s.x, s.y, gl.RGBA, gl.UNSIGNED_BYTE, tc);
-      const S = this.SA; Object.assign(s, { ver, w, h, wx, wy, uv: [s.x / S, s.y / S, (s.x + w) / S, s.y / S, s.x / S, (s.y + h) / S, (s.x + w) / S, (s.y + h) / S] }); this.sMap.set(key, s);
-      x.clearRect(X0, Y0, w, h); this.bill(this.sat, wx, wy, w, h, yb, s.uv, o); return;
+      const S = this.SA; Object.assign(s, { ver, w, h, wx, wy, occ: (w >= 96 || h >= 96) && Settings.sparseGround !== false && s.ver === undefined ? this.occOf(tc, w, h) : null, uv: [s.x / S, s.y / S, (s.x + w) / S, s.y / S, s.x / S, (s.y + h) / S, (s.x + w) / S, (s.y + h) / S] }); this.sMap.set(key, s);
+      x.clearRect(X0, Y0, w, h); this.billCells(this.sat, wx, wy, w, h, yb, [s.uv[0], s.uv[1], s.uv[6], s.uv[7]], s.occ, o); return;
     }
     const cell = this.dAlloc(w, h); if (!cell) { x.clearRect(X0, Y0, w, h); return; }
-    cell.s.x2.drawImage(this.cap, X0, Y0, w, h, cell.x, cell.y, w, h); x.clearRect(X0, Y0, w, h);
+    cell.s.x2.drawImage(this.cap, X0, Y0, w, h, cell.x, cell.y, w, h); if (o.grab) o.grab(X0, Y0, w, h, wx, wy, q); x.clearRect(X0, Y0, w, h);
     const SW = this.STW, SH = this.STH; this.bill(cell.s, wx, wy, w / q, h / q, yb, [cell.x / SW, cell.y / SH, (cell.x + w) / SW, cell.y / SH, cell.x / SW, (cell.y + h) / SH, (cell.x + w) / SW, (cell.y + h) / SH], o);
+  },
+  // perf: a moving character whose image is re-drawn only when asked (ver changes); in between the last image is re-used at the
+  // current position.  ax/ay = integer anchor (feet), rel = capture rect relative to the anchor.  Each key keeps one fixed atlas slot.
+  frameSprite(key, ver, ax, ay, yb, fn, rel, o = {}) {
+    this.fMap = this.fMap || new Map(); let s = this.fMap.get(key); const q = o.hi && this.Q > 1 ? this.Q : 1;
+    if (s && s.gen === this.sGen && s.ver === ver && s.q === q && s.uv) {
+      const oo = o.hi ? Object.assign({ lit: true }, o, { q }) : o; if (o.hi && o.shadow !== false) this.shadow(ax + s.dx + s.w / 2, yb, Math.min(26, s.w * .42));
+      this.bill(this.sat, ax + s.dx, ay + s.dy, s.w, s.h, yb, s.uv, oo); return; }
+    if (!s || s.gen !== this.sGen || s.q !== q) { const sl = this.sAlloc(Math.ceil(rel[2] * q) + 8, Math.ceil(rel[3] * q) + 8); if (!sl) { this.capture(yb, fn, null, 0, [ax + rel[0], ay + rel[1], rel[2], rel[3]], o); return; } s = { gen: this.sGen, q, sl }; this.fMap.set(key, s); }
+    s.ver = ver; s.uv = null;
+    const grab = (X0, Y0, w, h, wx, wy, qq) => { const sl = s.sl; if (w > sl.w || h > sl.h || qq !== q) return; const [tc, tx] = this.tmpCanvas(sl.w, sl.h); tx.clearRect(0, 0, sl.w, sl.h); tx.drawImage(this.cap, X0, Y0, w, h, 0, 0, w, h);
+      const gl = this.gl, S = this.SA; gl.bindTexture(gl.TEXTURE_2D, this.sat); gl.texSubImage2D(gl.TEXTURE_2D, 0, sl.x, sl.y, gl.RGBA, gl.UNSIGNED_BYTE, tc);
+      Object.assign(s, { dx: wx - ax, dy: wy - ay, w: w / q, h: h / q, uv: [sl.x / S, sl.y / S, (sl.x + w) / S, sl.y / S, sl.x / S, (sl.y + h) / S, (sl.x + w) / S, (sl.y + h) / S] }); };
+    this.capture(yb, fn, null, 0, [ax + rel[0], ay + rel[1], rel[2], rel[3]], Object.assign({}, o, { grab }));
   },
   tmpCanvas(w, h) { const k = w + 'x' + h; this.tmpC = this.tmpC || new Map(); let t = this.tmpC.get(k); if (!t) { if (this.tmpC.size > 60) this.tmpC.clear(); t = this.mk(w, h); this.tmpC.set(k, t); } return t; },
   dAlloc(w, h) {
@@ -258,7 +377,13 @@ const HD = {
     const [c, x2] = this.mk(this.STW, this.STH); const s = { c, x2, x: 0, y: 0, h: 0, used: true, isStrip: true }; this.strips.push(s); return this.dAlloc(w, h);
   },
   // an entire 2D canvas standing upright: canvas pixel (px,py) = world (ox+px, oy+py); row yb on the ground
-  plane(cv, ox, oy, yb, o = {}) { const e = this.texFor(cv, true), q = o.q || 1, w = o.w || cv.width / q, h = o.h || cv.height / q; this.bill(e.t, ox, oy, w, h, yb, [0, 0, w * q / e.w, 0, 0, h * q / e.h, w * q / e.w, h * q / e.h], o); },
+  plane(cv, ox, oy, yb, o = {}) { const q = o.q || 1, w = o.w || cv.width / q, h = o.h || cv.height / q, L = cv._L;
+    if (L && L.T && Settings.sparseGround !== false) { // perf: a layer plane (combat action plane) -> only its painted cells, from a bounding-box texture
+      const U = this.layerTex(L); if (!U.n) return; const e = U.e, CS = this.CS, T = L.T, ax = ox + w / 2, oo = Object.assign({}, o, { ax, sway: 0 });
+      for (let j = 0; j < T.ch; j++) for (let i = 0; i < T.cw; i++) if (T.cells[j * T.cw + i]) { const px0 = i * CS, py0 = j * CS, px1 = Math.min((i + 1) * CS, w * q), py1 = Math.min((j + 1) * CS, h * q); if (px1 <= px0 || py1 <= py0) continue;
+        const a0 = (px0 - U.bx) / e.w, a1 = (px1 - U.bx) / e.w, b0 = (py0 - U.by) / e.h, b1 = (py1 - U.by) / e.h; this.bill(e.t, ox + px0 / q, oy + py0 / q, (px1 - px0) / q, (py1 - py0) / q, yb, [a0, b0, a1, b0, a0, b1, a1, b1], oo); }
+      return; }
+    const e = this.texFor(cv, true); this.bill(e.t, ox, oy, w, h, yb, [0, 0, w * q / e.w, 0, 0, h * q / e.h, w * q / e.w, h * q / e.h], o); },
   // heat shimmer over a world point (forge, brazier): a w x h world-px box above (x, y), projected to the screen
   shimmerAt(x, y, w, h, amt = 1) { if (!this.cfg) return; const a = this.toScreen(x - w, y - h), b = this.toScreen(x + w, y + 6); if (a[2] <= 0 || b[0] < -20 || a[0] > CONFIG.LW + 20 || b[1] < -20 || a[1] > CONFIG.LH + 20) return; const lift = (b[1] - a[1]) * .9; this.cfg.shimmer = [amt, Math.min(a[0], b[0]), a[1] - lift, Math.max(a[0], b[0]), b[1]]; },
   // ---------------- lights (fed by Light.add while HD is on) ----------------
@@ -322,17 +447,32 @@ const HD = {
     const e = this.texFor(this.shadowTex(), false); const W4 = [P4[0], P4[2] / zs, P4[3], P4[5] / zs, P4[6], P4[8] / zs, P4[9], P4[11] / zs];
     this.shadows.push({ tex: e.t, P4, uv: [0, 0, 1, 0, 0, 1, 1, 1], W4, col: [1, 1, 1, al * (o.a || 1) + 2], X: this.X0 });
   },
+  // replace deferred ground records by their cells; tiled grounds skip cells hidden under a later fully-opaque ground canvas
+  expandAll(QS) {
+    const out = [], gs = []; let fb = this.firstBill; QS.forEach((q, i) => { if (q.G) gs.push([i, q.G]); });
+    const mkCover = (G) => ({ covers: (x0, y0, x1, y1) => { const kx = G.sw / G.w, ky = G.sh / G.h, px0 = G.sx + (x0 - G.x) * kx, px1 = G.sx + (x1 - G.x) * kx, py0 = G.sy + (y0 - G.y) * ky, py1 = G.sy + (y1 - G.y) * ky;
+      if (px0 < G.sx || py0 < G.sy || px1 > G.sx + G.sw || py1 > G.sy + G.sh) return false; const O = G.occ, CS = this.CS;
+      for (let j = Math.floor(py0 / CS); j * CS < py1; j++) for (let i = Math.floor(px0 / CS); i * CS < px1; i++) if (!O.opq[j * O.cw + i]) return false; return true; } });
+    let gi = 0; this.nq = 0;
+    for (let i = 0; i < QS.length; i++) { const q = QS[i]; if (i === this.firstBill) fb = out.length;
+      if (!q.G) { out.push(q); this.nq++; continue; }
+      const G = q.G; gi++; let covers = null;
+      if (G.rep) for (let k = gi; k < gs.length; k++) { const H = gs[k][1], a = H.col[3] >= 1.5 ? H.col[3] - 2 : H.col[3]; if (H.occ && !H.yy && a >= .999) (covers = covers || []).push(mkCover(H)); }
+      this.expandG(G, out, covers); }
+    if (this.firstBill >= 0) this.firstBill = fb; return out;
+  },
   // ---------------- render ----------------
   render() {
     const gl = this.gl, k = this.cfg, post = Gfx.level >= 2;
-    const want = post && Gfx.trim < 3 ? (Gfx.trim ? [1120, 630] : [1280, 720]) : [960, 540]; if (this.RW !== want[0]) this.resize(want[0], want[1]);
+    const ks = Math.min(1, Math.max(.5, CONFIG.HD_SCALE || 1)), w0 = post && Gfx.trim < 3 ? (Gfx.trim ? [1120, 630] : [1280, 720]) : [960, 540], want = [Math.round(w0[0] * ks / 16) * 16, Math.round(w0[1] * ks / 9) * 9]; if (this.RW !== want[0]) this.resize(want[0], want[1]); // CONFIG.HD_SCALE < 1: optional extra saving (softer image)
     for (const s of this.strips) if (s.used) { const e = this.texFor(s.c, true); s.tex = e.t; }
     if (this.useLight) this.buildLightMap();
     // fill vertex buffer
     const vf = this.vf; let o = 0; const runs = []; let cur = null;
-    let QS = this.quads; if (this.refl.length || this.shadows.length) { const fb = this.firstBill < 0 ? QS.length : this.firstBill; QS = QS.slice(0, fb).concat(this.shadows, this.refl, QS.slice(fb)); if (QS.length > this.MAXQ) QS.length = this.MAXQ; }
+    let QS = this.quads; if (QS.some(q => q.G)) QS = this.expandAll(QS);
+    if (this.refl.length || this.shadows.length) { const fb = this.firstBill < 0 ? QS.length : this.firstBill; QS = QS.slice(0, fb).concat(this.shadows, this.refl, QS.slice(fb)); if (QS.length > this.MAXQ) QS.length = this.MAXQ; }
     for (const q of QS) {
-      const t = q.tex && q.tex.isStrip ? q.tex.tex : q.tex; if (!cur || cur.t !== t) { cur = { t, n: 0 }; runs.push(cur); }
+      if (!q.P4) continue; const t = q.tex && q.tex.isStrip ? q.tex.tex : q.tex, op = !!q.op; if (!cur || cur.t !== t || cur.op !== op) { cur = { t, n: 0, op }; runs.push(cur); }
       const X = q.X;
       for (let i = 0; i < 4; i++) { vf[o++] = q.P4[i * 3]; vf[o++] = q.P4[i * 3 + 1]; vf[o++] = q.P4[i * 3 + 2]; vf[o++] = q.uv[i * 2]; vf[o++] = q.uv[i * 2 + 1]; vf[o++] = q.W4[i * 2]; vf[o++] = q.W4[i * 2 + 1]; vf[o++] = q.col[0]; vf[o++] = q.col[1]; vf[o++] = q.col[2]; vf[o++] = q.col[3]; vf[o++] = X[0]; vf[o++] = X[1]; vf[o++] = X[2]; }
       cur.n++;
@@ -350,7 +490,7 @@ const HD = {
     gl.uniform3f(sp.u.uFogC, k.fogC[0], k.fogC[1], k.fogC[2]); gl.uniform3f(sp.u.uFog, k.fog[0], k.fog[1], k.fog[2]);
     gl.uniform3f(sp.u.uCloud, k.cloud, .02 + World.wind * .03, 0); gl.uniform1f(sp.u.uTime, T); gl.uniform1f(sp.u.uDark, this.dark);
     this.litUniforms(sp);
-    let first = 0; for (const r of runs) { const tt = r.t || this.white; gl.uniform2f(sp.u.uTx, tt._tw || 1 / 1024, tt._th || 1 / 1024); gl.bindTexture(gl.TEXTURE_2D, tt); gl.drawElements(gl.TRIANGLES, r.n * 6, gl.UNSIGNED_SHORT, first * 12); first += r.n; }
+    let first = 0, bl = true; for (const r of runs) { const tt = r.t || this.white; if (r.op === bl) { bl = !r.op; if (bl) gl.enable(gl.BLEND); else gl.disable(gl.BLEND); } gl.uniform2f(sp.u.uTx, tt._tw || 1 / 1024, tt._th || 1 / 1024); gl.bindTexture(gl.TEXTURE_2D, tt); gl.drawElements(gl.TRIANGLES, r.n * 6, gl.UNSIGNED_SHORT, first * 12); first += r.n; }
     for (let i = 1; i < 5; i++) gl.disableVertexAttribArray(i);
     gl.disable(gl.BLEND);
     // blur chain (quarter res) for depth of field + bloom
@@ -368,8 +508,14 @@ const HD = {
     const d = k.dof; gl.uniform4f(pp.u.uDof, d[0], d[1], post ? d[2] : 0, d[3]); gl.uniform2f(pp.u.uBloom, k.bloom[0], post ? k.bloom[1] : 0); gl.uniform1f(pp.u.uGrade, 1); gl.uniform1f(pp.u.uVig, k.vig);
     // post FX (HIGH only): heat shimmer + light shafts.  cfg.shimmer = [amt, x0, y0, x1, y1] in low-res screen px; cfg.shafts = [strength, sunX, sunY, [r,g,b], decay]
     const fx = post && Settings.postFX !== false, sm = fx && k.shimmer, sf = fx && Gfx.trim < 1 && k.shafts; gl.uniform1f(pp.u.uPT, T % 1000);
+    gl.uniform1f(pp.u.uPV, this.postVig ? 1 : 0); gl.uniform1i(pp.u.uA, 2); gl.uniform1i(pp.u.uScr, 3);
+    this.scrIn = this.postVig && this.scrUsed(); gl.uniform1f(pp.u.uScrOn, this.scrIn ? 1 : 0); if (this.scrIn) { const e = this.texFor(this.scr, true); gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, e.t); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.fbo.s.t); } // texFor binds on unit 0: restore the scene texture
     if (sm) { gl.uniform1f(pp.u.uShimA, sm[0]); gl.uniform4f(pp.u.uShimR, sm[1] / CONFIG.LW, 1 - sm[4] / CONFIG.LH, sm[3] / CONFIG.LW, 1 - sm[2] / CONFIG.LH); } else gl.uniform1f(pp.u.uShimA, 0);
-    if (sf && sf[0] > .01) { const cc = sf[3] || [1, .9, .7]; gl.uniform4f(pp.u.uSh, sf[0], sf[1] / CONFIG.LW, 1 - sf[2] / CONFIG.LH, sf[4] || .9); gl.uniform3f(pp.u.uShC, cc[0], cc[1], cc[2]); } else gl.uniform4f(pp.u.uSh, 0, 0, 0, 0);
+    if (sf && sf[0] > .01) { const cc = sf[3] || [1, .9, .7]; gl.uniform4f(pp.u.uSh, sf[0], sf[1] / CONFIG.LW, 1 - sf[2] / CONFIG.LH, sf[4] || .9); gl.uniform3f(pp.u.uShC, cc[0], cc[1], cc[2]);
+      const A = this.fbo.a, hp = this.shp; gl.useProgram(hp.p); gl.uniform1i(hp.u.uB, 0); gl.uniform4f(hp.u.uSh, sf[0], sf[1] / CONFIG.LW, 1 - sf[2] / CONFIG.LH, sf[4] || .9); gl.uniform1f(hp.u.uPT, T % 1000);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, A.f); gl.viewport(0, 0, A.w, A.h); gl.bindTexture(gl.TEXTURE_2D, this.fbo.b.t); fsq();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, this.RW, this.RH); gl.useProgram(pp.p); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, A.t); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.fbo.s.t);
+    } else gl.uniform4f(pp.u.uSh, 0, 0, 0, 0);
     fsq();
     this.on = false;
     return this.c;

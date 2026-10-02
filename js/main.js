@@ -20,18 +20,18 @@ function frame(now) {
     Music.update(); Amb.update(DT);
     // draw
     useCtx(wctx); wctx.setTransform(1, 0, 0, 1, 0, 0); wctx.globalAlpha = 1; wctx.globalCompositeOperation = 'source-over';
-    const c2 = Scene.cur; HD.live = !!(c2 && c2.hd && !Scene.transitioningOut && HD.wanted() && HD.init());
+    let vigBaked = false; const c2 = Scene.cur; HD.live = !!(c2 && c2.hd && !Scene.transitioningOut && HD.wanted() && HD.init());
     if (HD.live) {
       if (c2.draw) c2.draw(); useCtx(wctx);
-      const out = HD.on ? HD.render() : null; HD.on = false;
+      HD.postVig = true; const out = HD.on ? HD.render() : null; HD.on = false; vigBaked = !!out;
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.imageSmoothingEnabled = false;
-      if (out) g.drawImage(out, 0, 0, CONFIG.W, CONFIG.H); g.drawImage(HD.scr, 0, 0, CONFIG.W, CONFIG.H);
+      if (out) g.drawImage(out, 0, 0, CONFIG.W, CONFIG.H); if (!(out && HD.scrIn) && HD.scrUsed()) g.drawImage(HD.scr, 0, 0, CONFIG.W, CONFIG.H);
     } else {
       if (c2 && c2.draw) c2.draw();
       wctx.setTransform(1, 0, 0, 1, 0, 0); wctx.globalAlpha = 1; wctx.globalCompositeOperation = 'source-over'; const graded = Grade.process(wc, CONFIG.LW, CONFIG.LH);
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.imageSmoothingEnabled = false; g.drawImage(graded, 0, 0, CONFIG.W, CONFIG.H);
     }
-    Post.draw();
+    Post.draw(vigBaked);
     UI.layer = 'scene'; if (c2 && c2.ui) c2.ui();
     FloatText.draw(); Post.drawFlash(); Overlays.draw(); Toast.draw(); Banner.draw(); Scene.draw(); Post.drawFade();
   } catch (e) { console.error(e); }
