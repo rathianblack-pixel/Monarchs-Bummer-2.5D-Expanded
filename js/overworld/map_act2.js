@@ -159,7 +159,7 @@ Scenes.overworld2 = { hd: true, timeRuns: true,
     PFont.draw(c, 'PORT MOPEWAY', 130, 845, 10, 'rgba(255,244,214,.92)', 'center', 'alphabetic', 'rgba(20,12,8,.7)'); PFont.draw(c, 'THE DEEP', 700, 470, 10, 'rgba(160,200,255,.5)', 'center', 'alphabetic', null);
     HD.groundLayer('top');
     Light.begin(mixA(World.ambient(), [255, 255, 255], .3)); Light.add(1050, 700, 200, '#40e0d0', .5, .2); Light.add(390, 320, 220, '#ff90d0', .35, .2); Light.add(130, 790, 80, '#ffb060', .3 + nk * .6, .1); if (nk > .2) Light.add(px, py - 6, 40, '#ffd090', .5 * nk, .2); Light.apply();
-    HD.screenLayer(); if (World.rain > .05) Weather.draw(400, World.rain * .6);
+    HD.screenLayer(); outdoorWeather(400, .6);
   },
   draw() {
     if (HD.live && this.drawHD) return this.drawHD();
@@ -179,7 +179,7 @@ Scenes.overworld2 = { hd: true, timeRuns: true,
     PFont.draw(c, 'PORT MOPEWAY', 130, 845, 10, 'rgba(255,244,214,.92)', 'center', 'alphabetic', 'rgba(20,12,8,.7)');
     Particles.draw(false);
     Light.begin(mixA(World.ambient(), [255, 255, 255], .3)); Light.add(1050, 700, 160, '#40e0d0', .5, .2); Light.add(390, 320, 180, '#ff90d0', .3, .2); Light.apply();
-    c.setTransform(1, 0, 0, 1, 0, 0); if (World.rain > .05) Weather.draw(400, World.rain * .6);
+    c.setTransform(1, 0, 0, 1, 0, 0); outdoorWeather(400, .6);
   },
   ui() {
     HUD.draw({ buttons: [['PORT', () => { this.goTo(0); if (this.route) this.pending = () => this.confirm(); else this.confirm(); }, 'Back to Port Mopeway', 64]] });

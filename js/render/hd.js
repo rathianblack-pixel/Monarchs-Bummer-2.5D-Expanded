@@ -67,7 +67,7 @@ const HD = {
             vec3 sh = L * (.74 + .42 * kd - (1. - N.z) * .06);
             for (int i = 0; i < NLM; i++) { if (i >= uNL) break; vec4 lp = uLP[i];
               vec3 Lv = plane > .5 ? vec3(lp.x - vW.x, vW.y - lp.y, 36.) : vec3(lp.x - vW.x, uLH - hgt, lp.y - vX.y);
-              float d = length(vec2(Lv.x, plane > .5 ? Lv.y : Lv.z)); float at = clamp(1. - d / lp.z, 0., 1.); at *= at;
+              float d = length(vec2(Lv.x, plane > .5 ? Lv.y : Lv.z)); if (d >= lp.z) continue; float at = 1. - d / lp.z; at *= at;
               float df = max(dot(N, normalize(Lv)), 0.); sh += uLC[i] * at * (df * 1.05 - .3); }
             vec2 rd = normalize(N.xy + vec2(.0001)); float rim = pow(1. - N.z, 2.2) * (.55 + .45 * max(dot(rd, -normalize(K.xy + vec2(.0001))), 0.)) * uRim.a;
             c.rgb = c.rgb * max(sh, vec3(0.)) + uRim.rgb * rim * (L * .5 + .5) * c.a;
@@ -175,7 +175,7 @@ const HD = {
     if (!this.cfg.dist) this.cfg.dist = (CONFIG.LH / 2) / Math.tan(this.cfg.fov * Math.PI / 360);
     if (this.cfg.zs === 'auto') this.cfg.zs = 1 / Math.sin(this.cfg.pitch * Math.PI / 180);
     this.setCam(); this.calcView();
-    this.quads.length = 0; this.nq = 0; this.lights.length = 0; this.refl = []; this.shadows = []; this.firstBill = -1; this.deferTo = null; this.water = this.cfg.water || null; this.Q = Gfx.level >= 2 && Settings.hiSprites !== false && Gfx.trim < 2 ? 2 : 1; this.tint = null; this.planeL = null; this.amb = [255, 255, 255]; this.useLight = false; this.dark = 0;
+    this.quads.length = 0; this.nq = 0; this.reb = 0; this.lights.length = 0; this.refl = []; this.shadows = []; this.firstBill = -1; this.deferTo = null; this.water = this.cfg.water || null; this.Q = Gfx.level >= 2 && Settings.hiSprites !== false && Gfx.trim < 2 ? 2 : 1; this.tint = null; this.planeL = null; this.amb = [255, 255, 255]; this.useLight = false; this.dark = 0;
     for (const s of this.strips) { s.x = 0; s.y = 0; s.h = 0; s.used = false; }
     const sx = this.scrx; sx.setTransform(1, 0, 0, 1, 0, 0); sx.clearRect(0, 0, CONFIG.LW, CONFIG.LH); sx.globalAlpha = 1; sx.globalCompositeOperation = 'source-over';
   },
@@ -223,7 +223,7 @@ const HD = {
   // run fn() (which draws in 2D world coords) and turn whatever it drew into a billboard.
   // key -> cache the result in the static atlas (re-captured when ver changes); rect -> clip to a 2D rect
   capture(yb, fn, key, ver, rect, o = {}) {
-    if (key) { const s = this.sMap.get(key); if (s && s.gen === this.sGen && s.ver === ver) { if (s.w) this.bill(this.sat, s.wx, s.wy, s.w, s.h, yb, s.uv, o); return; } }
+    if (key) { const s = this.sMap.get(key); if (s && s.gen === this.sGen && (s.ver === ver || (this.reb = (this.reb || 0) + 1) > CONFIG.RECAPTURES_PER_FRAME)) { if (s.w) this.bill(this.sat, s.wx, s.wy, s.w, s.h, yb, s.uv, o); return; } } // perf: when many cached art pieces change version at once (dusk/dawn), rebuild a couple per frame and show the previous version meanwhile
     const v = this.view, ox = rect ? Math.floor(rect[0]) - 2 : Math.max(v.x0 - 30, (this.cfg.tx | 0) - 550), oy = rect ? Math.floor(rect[1]) - 2 : v.y0 - 300, x = this.capx, b = this.bb;
     const P2 = CanvasRenderingContext2D.prototype, q = (o.hi && rect && !key && this.Q > 1 && (rect[2] + 4) * this.Q < this.cap.width && (rect[3] + 4) * this.Q < this.cap.height) ? this.Q : 1;
     if (o.hi) o = Object.assign({ lit: true }, o, { q });
@@ -262,13 +262,13 @@ const HD = {
   // heat shimmer over a world point (forge, brazier): a w x h world-px box above (x, y), projected to the screen
   shimmerAt(x, y, w, h, amt = 1) { if (!this.cfg) return; const a = this.toScreen(x - w, y - h), b = this.toScreen(x + w, y + 6); if (a[2] <= 0 || b[0] < -20 || a[0] > CONFIG.LW + 20 || b[1] < -20 || a[1] > CONFIG.LH + 20) return; const lift = (b[1] - a[1]) * .9; this.cfg.shimmer = [amt, Math.min(a[0], b[0]), a[1] - lift, Math.max(a[0], b[0]), b[1]]; },
   // ---------------- lights (fed by Light.add while HD is on) ----------------
-  light(x, y, r, col, a, glow) { this.lights.push([x, y, r, col, a, glow]); },
+  light(x, y, r, col, a, glow, soft) { this.lights.push([x, y, r, col, a, glow, !!soft]); },
   buildLightMap() {
     const v = this.view, L = this.lightRect = this.cfg.lightRect || [v.x0 - 40, v.y0 - 40, v.x1 - v.x0 + 80, v.y1 - v.y0 + 80];
     const x = this.lx, W = this.lc.width, H = this.lc.height, sx = W / L[2], sy = H / L[3];
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.fillStyle = rgb(this.amb[0], this.amb[1], this.amb[2]); x.fillRect(0, 0, W, H);
     x.globalCompositeOperation = 'lighter'; x.setTransform(sx, 0, 0, sy, -L[0] * sx, -L[1] * sy);
-    for (const [lx, ly, r, col, a] of this.lights) { if (lx + r < L[0] || lx - r > L[0] + L[2] || ly + r < L[1] || ly - r > L[1] + L[3]) continue; LightSprite.draw(x, col, 'l', lx, ly, r, a); } // off-map lights are skipped
+    x.imageSmoothingEnabled = true; for (const [lx, ly, r, col, a] of this.lights) { if (a <= .01 || lx + r < L[0] || lx - r > L[0] + L[2] || ly + r < L[1] || ly - r > L[1] + L[3]) continue; x.globalAlpha = Math.min(1, a); x.drawImage(LightSprite.get(col, 'l'), lx - r, ly - r, r * 2, r * 2); } x.globalAlpha = 1; x.imageSmoothingEnabled = false; // off-map lights are skipped
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over';
     const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, this.lightTex); if (this._lmUp) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.lc); else { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.lc); this._lmUp = true; } gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   },
@@ -284,7 +284,8 @@ const HD = {
     const oc = k.outline || (nk > .5 ? [.1, .08, .24] : [.24, .1, .2]); gl.uniform3f(sp.u.uOut, oc[0], oc[1], oc[2]);
     gl.uniform1f(sp.u.uLH, k.lightH || 22);
     const tx = k.tx || 0, ty = k.planeY !== undefined ? (k.th !== undefined ? k.planeY - 40 : k.planeY) : (k.ty || 0);
-    const cand = this.useLight ? this.lights.filter(l => l[4] > .05 && l[2] > 8).map(l => [l, l[4] * l[2] / (1 + Math.hypot(l[0] - tx, l[1] - ty) / 160)]).sort((a, b) => b[1] - a[1]).slice(0, Math.min(this.NLM || 8, Gfx.level >= 2 && Gfx.trim < 1 ? 8 : 4)) : []; // per-pixel lights: 8 on full HIGH, 4 when trimmed / MEDIUM
+    const vw = this.view, maxL = Math.min(this.NLM || 8, Gfx.level >= 2 && Gfx.trim < 1 ? (nk > .5 ? CONFIG.NIGHT_PIXEL_LIGHTS : 8) : 4); // perf: night scenes have 40+ lights; only the strongest few on screen go per-pixel (the light map still has them all)
+    const cand = this.useLight && maxL > 0 ? this.lights.filter(l => !l[6] && l[4] > .08 && l[2] > 8 && l[0] + l[2] > vw.x0 && l[0] - l[2] < vw.x1 && l[1] + l[2] > vw.y0 && l[1] - l[2] < vw.y1).map(l => [l, l[4] * l[2] / (1 + Math.hypot(l[0] - tx, l[1] - ty) / 160)]).sort((a, b) => b[1] - a[1]).slice(0, maxL) : []; // per-pixel lights: 8 on full HIGH, 4 when trimmed / MEDIUM
     const LP = this.LPa || (this.LPa = new Float32Array(32)), LC = this.LCa || (this.LCa = new Float32Array(24)); LP.fill(0); LC.fill(0);
     cand.forEach(([l], i) => { const c = hexToRgb(l[3]); LP[i * 4] = l[0]; LP[i * 4 + 1] = l[1]; LP[i * 4 + 2] = l[2] * 1.15; LP[i * 4 + 3] = 0; const a = Math.min(1.4, l[4]) * .95; LC[i * 3] = c[0] / 255 * a; LC[i * 3 + 1] = c[1] / 255 * a; LC[i * 3 + 2] = c[2] / 255 * a; });
     gl.uniform1i(sp.u.uNL, cand.length); if (sp.u['uLP[0]']) gl.uniform4fv(sp.u['uLP[0]'], LP.subarray(0, this.NLM * 4)); else if (sp.u.uLP) gl.uniform4fv(sp.u.uLP, LP.subarray(0, this.NLM * 4)); if (sp.u['uLC[0]']) gl.uniform3fv(sp.u['uLC[0]'], LC.subarray(0, this.NLM * 3)); else if (sp.u.uLC) gl.uniform3fv(sp.u.uLC, LC.subarray(0, this.NLM * 3));
@@ -312,7 +313,7 @@ const HD = {
   shadow(x, y, rx, o = {}) {
     if (Settings.softShadows === false || !this.cfg) return; const zs = this.cfg.zs; const nk = typeof World !== 'undefined' ? World.nightK() : 0;
     let dx = .45, dy = .5, len = rx * (1.5 + (1 - nk) * .7), al = .26 * (1 - nk * .5);
-    let best = null, bw = 0; if (this.useLight) for (const l of this.lights) { const d = Math.hypot(l[0] - x, l[1] - y); if (d < l[2] * .9 && d > 2) { const wgt = l[4] * (1 - d / l[2]); if (wgt > bw) { bw = wgt; best = [l, d]; } } }
+    let best = null, bw = 0; if (this.useLight) for (const l of this.lights) { if (l[6]) continue; const d = Math.hypot(l[0] - x, l[1] - y); if (d < l[2] * .9 && d > 2) { const wgt = l[4] * (1 - d / l[2]); if (wgt > bw) { bw = wgt; best = [l, d]; } } }
     if (best && bw > .12) { const [l, d] = best; dx = (x - l[0]) / d; dy = (y - l[1]) / d; len = rx * (1.4 + Math.min(2.2, d / 30)); al = Math.min(.5, .22 + bw * .4); }
     else if (nk > .6 && !this.useLight) return;
     const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n; const px = -dy, py = dx, hw = rx * .95;
@@ -387,7 +388,7 @@ function mat4Mul(a, b) { const o = new Float32Array(16); for (let i = 0; i < 4; 
 (function () {
   const add = Light.add, begin = Light.begin, apply = Light.apply;
   Light.begin = function (amb) { if (HD.on) { HD.amb = amb; HD.useLight = true; this.list.length = 0; return; } return begin.call(this, amb); };
-  Light.add = function (x, y, r, col, a = 1, flick = 0, glow = .35) { if (HD.on) { const f = flick ? 1 + (noise1(T * 9 + x * .3) * .5 + noise1(T * 23 + y) * .5) * flick : 1; HD.light(x, y, r * f, col, a * f, glow); return; } return add.call(this, x, y, r, col, a, flick, glow); };
+  Light.add = function (x, y, r, col, a = 1, flick = 0, glow = .35, soft = false) { if (HD.on) { if (a <= .01 || r <= 0) return; const f = flick ? 1 + (noise1(T * 9 + x * .3) * .5 + noise1(T * 23 + y) * .5) * flick : 1; HD.light(x, y, r * f, col, a * f, glow, soft); return; } return add.call(this, x, y, r, col, a, flick, glow); };
   Light.apply = function () { if (HD.on) return; return apply.call(this); };
   const ca = Cam.apply; Cam.apply = function (c, par, round) { if (HD.on && HD.planeL && c === HD.planeL.x) { const q = HD.planeL.q || 1; c.setTransform(q, 0, 0, q, -HD.planeL.ox * q, -HD.planeL.oy * q); return; } return ca.call(this, c, par, round); };
   const ts = Cam.toScreen; Cam.toScreen = function (x, y) { if (HD.live && HD.cfg) { const p = HD.toScreen(x, y); return [p[0], p[1]]; } return ts.call(this, x, y); };

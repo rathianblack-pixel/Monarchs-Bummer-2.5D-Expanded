@@ -197,7 +197,7 @@ Scenes.overworld = {
     Light.add(fx, fy - 30, 90, '#a040e0', .7, .2); Light.add(MAP_NODES[0][0], MAP_NODES[0][1] - 20, 70 + World.nightK() * 30, '#ffb060', .3 + World.nightK() * .6, .1);
     if (World.nightK() > .2) { this.pumpkins.forEach(([x, y]) => Light.add(x, y, 22, '#ff9030', .8 * World.nightK(), .3)); Light.add(px, py - 6, 40, '#ffd090', .5 * World.nightK(), .2); }
     Light.apply();
-    c.setTransform(1, 0, 0, 1, 0, 0); if (World.rain > .05) Weather.draw(400, World.rain * .6);
+    c.setTransform(1, 0, 0, 1, 0, 0); outdoorWeather(400, .6);
   },
   ui() {
     HUD.draw({ buttons: [['VILLAGE', () => { this.goTo(0); if (this.route) this.pending = () => this.confirm(); else this.confirm(); }, 'Walk home', 78]] });

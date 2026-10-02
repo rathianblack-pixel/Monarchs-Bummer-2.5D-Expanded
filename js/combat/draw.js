@@ -123,11 +123,11 @@ Object.assign(Scenes.combat, {
       HD.plane(L.c, L.ox, L.oy, CGY, { w: L.w, h: L.h, q: L.q, plane: true, lit: true }); HD.shadow(this.P.x, CGY + 2, 15); if (this.E.pose !== 'dead') HD.shadow(this.E.x, CGY + 2, Math.min(40, 12 + this.E.h * .15)); HD.planeL = null;
       drawArena3D(this.area, this.raid, t, { dark: this.dark, wallShift: this.wallShift, bolt: this.bolt }, true);
       HD.screenLayer(); if (this.dark > .01) { ctx.globalAlpha = this.dark * .25; P('#08040e', 0, 0, 640, 360); ctx.globalAlpha = 1; }
-      if ((this.area === 0 || this.raid) && World.rain > .05) Weather.draw(CGY + 60, World.rain * .7);
+      combatWeather(this.area, this.raid);
       return;
     }
     c.setTransform(1, 0, 0, 1, 0, 0);
-    if ((this.area === 0 || this.raid) && World.rain > .05) Weather.draw(CGY + 60, World.rain * .7);
+    combatWeather(this.area, this.raid);
     if (this.area === 2 && !this.raid) Weather.fog(.8, '#b0b8d0', ca);
     if (this.area === 1 && !this.raid) Weather.fog(.3, '#a0c0a0', ca);
     Cam.apply(c, 1); Particles.draw(true); c.setTransform(1, 0, 0, 1, 0, 0);
@@ -213,3 +213,10 @@ Object.assign(Scenes.combat, {
   }
 });
 function P2(c, x, y, w, h) { P(c, x, y, w, h); }
+
+/* weather in battle follows the world weather. Per-arena exposure: 1 = open sky, <1 = under a canopy, 0 = indoors / underwater / above the clouds */
+const ARENA_SKY = { 0: 1, 1: .55, 2: 1, 3: .85, 4: 0, 5: 1, 6: 0, 7: 1, 8: 0, 9: 1 };
+function combatWeather(area, raid) {
+  const k = raid ? 1 : (ARENA_SKY[area] !== undefined ? ARENA_SKY[area] : 0);
+  outdoorWeather(CGY + 60, k * .7, { snowFromRain: !raid && area === 7 });
+}

@@ -351,5 +351,5 @@ Scenes.overworld.drawHD = function () {
   // ---- screen overlays ----
   HD.screenLayer(); c = ctx;
   if (this.bolt > .6) { const [sx] = Cam.toScreen(this.boltX, 200); let x = sx, y = 0; for (let k = 0; k < 9; k++) { const nx = x + rnd(-12, 12), ny = y + 20; pLine('#f0e8ff', x, y, nx, ny, 1); x = nx; y = ny; } }
-  if (World.rain > .05) Weather.draw(400, World.rain * .6);
+  outdoorWeather(400, .6);
 };

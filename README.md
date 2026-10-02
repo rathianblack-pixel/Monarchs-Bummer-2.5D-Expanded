@@ -65,7 +65,7 @@ Set `Settings.weaponDeaths = false` to bring back the original one-per-monster d
 `node tools/shot.js plan.json outDir` (Playwright + Chromium) loads the game headless, runs each plan step (`{name, gfx, setup, scene, args, wait, eval, query}`), saves a screenshot, and prints any console errors. v4 before/after comparison sheets (HIGH and LOW) and a feature sheet are in `shots/v4/`.
 
 ## Performance
-Settings → **Battle HUD**: MINIMAL (default: a slim command list, a nameplate over the enemy, and a HUD that slides away during attacks; round thumb buttons on touch devices) or CLASSIC (the v4.0 cards and boxes). Settings → **Battle camera**: CLOSE (default) or WIDE.
+Settings → **Battle HUD**: MINIMAL (default: a slim command list, a nameplate over the enemy, and a HUD that slides away during attacks; round thumb buttons on touch devices) or CLASSIC (the v4.0 cards and boxes). Settings → **Battle camera**: CLOSE (default) or WIDE. Settings → **Character sprites**: HD (default; the player and every humanoid NPC, companion and enemy are drawn with 3D-style shading, hue-shifted colours and tinted outlines) or CLASSIC.
 
 Settings → **Graphics**: AUTO (default) / HIGH / MEDIUM / LOW.
 - HIGH: **2.5D** village, overworld and combat (full res, depth of field + bloom), 2× lit sprites with soft shadows and reflections, light shafts + heat shimmer, dust motes, colour grade, full particles.

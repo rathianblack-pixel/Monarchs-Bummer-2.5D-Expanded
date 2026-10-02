@@ -1,6 +1,6 @@
 // Service worker: caches the whole game so it runs offline once installed.
 // Bump VERSION whenever you ship an update so phones fetch the new files.
-const VERSION = 'bummer-v4.1.1';
+const VERSION = 'bummer-v4.4';
 const FILES = [
  "./",
  "index.html",
@@ -34,8 +34,10 @@ const FILES = [
  "js/characters/player.js",
  "js/characters/monsters.js",
  "js/characters/monsters_act2.js",
+ "js/characters/monsters_fx.js",
  "js/render/style.js",
  "js/characters/anim.js",
+ "js/characters/hero_hd.js",
  "js/render/topdown.js",
  "js/render/hd.js",
  "js/render/motes.js",

@@ -56,3 +56,11 @@ const Weather = {
   }
 };
 Weather.init();
+/* one entry point for every OUTDOOR scene: rain scaled by how sheltered the place is (1 = open sky, 0 = roofed/underwater) plus snow.
+   snowFromRain: cold places turn falling rain into snow. Interiors never call this - their windows show the weather instead. */
+function outdoorWeather(groundY, shelter = 1, o = {}) {
+  const snow = typeof World.snow === 'number' ? World.snow : 0, rain = World.rain * shelter;
+  if (shelter <= 0) return;
+  if (o.snowFromRain) { const k = Math.max(snow, World.rain) * shelter; if (k > .02) Weather.draw(groundY, 0, false, k); return; }
+  if (rain > .02 || snow > .02) Weather.draw(groundY, rain, false, snow * shelter);
+}

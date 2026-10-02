@@ -26,6 +26,7 @@ characters/monsters.js
 characters/monsters_act2.js
 render/style.js
 characters/anim.js
+characters/hero_hd.js
 render/topdown.js
 render/hd.js
 render/motes.js

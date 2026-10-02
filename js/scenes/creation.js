@@ -26,7 +26,7 @@ Scenes.creation = {
     // candles
     [[380, 120], [590, 140]].forEach(([x, y], i) => { P('#e8dcc0', x, y, 4, 14); P('#c8b890', x, y, 1, 14); const fh = 3 + noise1(T * 8 + i) * 1.5; pEll('#ffb040', x + 2, y - 3, 1.6, fh); P('#fff4c0', x + 1, y - 3, 1, 2); });
     const o = this.pose();
-    const look = Object.assign({ skin: SKIN_TONES[this.skin], hair: HAIR_COLS[this.hairC], hairStyle: 'short', hood: true, tier: 0, wTier: 0, weapon: CLASSES[this.cls].weapon, element: CLASSES[this.cls].element, body: this.body, seed: 1, s: 3 * (1 + this.pop * .05), face: 1 }, o);
+    const look = Object.assign({ skin: SKIN_TONES[this.skin], hair: HAIR_COLS[this.hairC], hairStyle: 'short', hood: true, tier: 0, wTier: 0, weapon: CLASSES[this.cls].weapon, element: CLASSES[this.cls].element, body: this.body, seed: 1, s: 3 * (1 + this.pop * .05), face: 1, hero: true }, o);
     drawChar(470, 296, look);
     if (this.cls === 'sword' && o.slash > 0 && o.slash < 1) { ctx.globalAlpha = .7; for (let i = 0; i < 10; i++) { const a = lerp(-1.6, 1.4, i / 10); pLine('#ffffff', 480 + Math.sin(a) * 50, 230 - Math.cos(a) * 50, 480 + Math.sin(a) * 58, 230 - Math.cos(a) * 58, 2); } ctx.globalAlpha = 1; }
     if (this.cls === 'water') { const a = this.t * 3; pEll('#3a8ad8', 500 + Math.cos(a) * 14, 250 + Math.sin(a) * 5, 3, 3.5); P('#bfe8ff', 499 + Math.cos(a) * 14, 249 + Math.sin(a) * 5, 1, 1); }

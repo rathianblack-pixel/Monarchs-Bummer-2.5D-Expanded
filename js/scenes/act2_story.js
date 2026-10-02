@@ -120,7 +120,7 @@ Scenes.sail = { hd: true,
       HD.capture(230, () => { a2DrawBoat(bx, 230, t, this.crew(t)); }, null, 0, [bx - 70, 140, 140, 110]);
       HD.layer('top'); Particles.draw(false); HD.groundLayer('top');
       Light.begin(mixA(World.ambient(), [255, 250, 240], .4)); Light.add(bx, 200, 120, '#fff0d0', .3); Light.apply();
-      HD.screenLayer(); return;
+      HD.screenLayer(); outdoorWeather(300, .8); return;
     }
     const c = ctx; c.setTransform(1, 0, 0, 1, 0, 0);
     drawSkyGradient(nk > .5 ? '#0a1030' : '#4a8ad0', nk > .5 ? '#2a3a6a' : '#c8e0f0', 0, 200); drawStars(nk, 9, 160); drawClouds(12, 60, '#f0f4ff', 8, .8);
@@ -128,7 +128,7 @@ Scenes.sail = { hd: true,
     a2Sea(t, 186, Gfx.level >= 1); a2DrawBoat(bx, 262, t, this.crew(t));
     c.globalAlpha = .35; for (let i = 0; i < 6; i++) P('#e8f4ff', bx - (this.to === 2 ? 60 + i * 12 : -60 - i * 12), 274 + Math.sin(t * 3 + i) * 2, 8, 1); c.globalAlpha = 1;
     Particles.draw(false);
-    Light.begin(mixA(World.ambient(), [255, 250, 240], .4)); Light.apply(); c.setTransform(1, 0, 0, 1, 0, 0);
+    Light.begin(mixA(World.ambient(), [255, 250, 240], .4)); Light.apply(); c.setTransform(1, 0, 0, 1, 0, 0); outdoorWeather(300, .8);
   },
   ui() { UI.text('Click / SPACE to skip', 1260, 700, { align: 'right', size: 12, col: COL.dim, bold: false }); }
 };

@@ -32,7 +32,7 @@ const HUD = {
 function openSettings() {
   if (Overlays.has('settings')) return; SFX.play('page');
   const ov = Overlays.push({ name: 'settings', a: 0, update(dt) { this.a = Math.min(1, this.a + dt * 6);  }, draw() {
-    g.globalAlpha = this.a * .6; g.fillStyle = '#000'; g.fillRect(0, 0, 1280, 720); g.globalAlpha = this.a; const x = 390, y = 110 + (1 - this.a) * 20; UI.panel(x, y - 20, 500, 560, { title: 'SETTINGS' });
+    g.globalAlpha = this.a * .6; g.fillStyle = '#000'; g.fillRect(0, 0, 1280, 720); g.globalAlpha = this.a; const x = 390, y = 110 + (1 - this.a) * 20; UI.panel(x, y - 20, 500, 600, { title: 'SETTINGS' });
     Settings.master = UI.slider('Master', x + 40, y + 80, 420, Settings.master); Settings.music = UI.slider('Music', x + 40, y + 120, 420, Settings.music); Settings.amb = UI.slider('Ambience', x + 40, y + 160, 420, Settings.amb); Settings.sfx = UI.slider('Sound FX', x + 40, y + 200, 420, Settings.sfx);
     Settings.text = UI.slider('Text speed', x + 40, y + 240, 420, Settings.text / 2, { fmt: v => (v * 2).toFixed(1) + '×' }) * 2; Settings.text = Math.max(.3, Settings.text);
     Settings.shake = UI.slider('Screen shake', x + 40, y + 280, 420, Settings.shake);
@@ -40,8 +40,9 @@ function openSettings() {
     UI.text('Graphics', x + 40, y + 362, { size: 15 }); if (UI.btn(Gfx.label(), x + 190, y + 342, 200, 30, { size: 14, id: 'gfxq' })) Gfx.cycle();
     UI.text('Battle HUD', x + 40, y + 402, { size: 15 }); if (UI.btn(Settings.hud === 'classic' ? 'CLASSIC' : 'MINIMAL', x + 190, y + 382, 200, 30, { size: 14, id: 'hudq' })) Settings.hud = Settings.hud === 'classic' ? 'minimal' : 'classic';
     UI.text('Battle camera', x + 40, y + 442, { size: 15 }); if (UI.btn(Settings.combatCam === 'wide' ? 'WIDE' : 'CLOSE', x + 190, y + 422, 200, 30, { size: 14, id: 'camq' })) Settings.combatCam = Settings.combatCam === 'wide' ? 'close' : 'wide';
+    UI.text('Character sprites', x + 40, y + 482, { size: 15 }); if (UI.btn(Settings.heroArt === 'classic' ? 'CLASSIC' : 'HD', x + 190, y + 462, 200, 30, { size: 14, id: 'heroq' })) Settings.heroArt = Settings.heroArt === 'classic' ? 'hd' : 'classic';
     Audio.applyVolumes();
-    if (UI.btn('Done', x + 170, y + 470, 160, 40, { accent: true })) close();
+    if (UI.btn('Done', x + 170, y + 512, 160, 40, { accent: true })) close();
     g.globalAlpha = 1;
   } });
   function close() { saveSettings(); Overlays.pop(ov); SFX.play('page'); }

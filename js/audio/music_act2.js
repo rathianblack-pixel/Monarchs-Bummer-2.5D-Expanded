@@ -62,7 +62,7 @@ Object.assign(TRACKS, {
 Object.assign(AMBIENCE, {
   a5: { beds: { wind: .16, river: .12 }, events: [['wave', 5], ['gull', 3], ['creak', 1]], outdoor: true },
   a6: { beds: { drone: .14, river: .05, spectral: .08 }, events: [['bubble', 8], ['whalecall', .6], ['stone', 1]] },
-  a7: { beds: { wind: .32 }, events: [['icecrack', 2], ['howl', 1], ['gust', 2]], outdoor: true },
+  a7: { beds: { wind: .32 }, events: [['icecrack', 2], ['howl', 1], ['gust', 2]], outdoor: 'snow' },
   a8: { beds: { wind: .26 }, events: [['gust', 3], ['bell', .6], ['bird', 2, 'day']], outdoor: true },
   a9: { beds: { wind: .08, room: .05 }, events: [['applause', 1.2], ['pop', 2], ['chatter', 2]], outdoor: true },
   map2: { beds: { wind: .2, river: .1 }, events: [['wave', 3], ['gull', 2], ['whalecall', .4]], outdoor: true },

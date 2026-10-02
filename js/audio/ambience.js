@@ -32,7 +32,7 @@ const Amb = {
   bedLevel(k, v, time = 1) { const b = this.beds[k]; if (!b) return; b.level = v; b.out.gain.setTargetAtTime(Math.max(.0001, v), Audio.ctx.currentTime, time / 3); },
   applyWeather() {
     if (!Audio.ctx || !this.profile) return; const outdoor = this.profile.outdoor;
-    const rain = outdoor ? this.weather.rain : this.weather.rain * .25;
+    const rain = outdoor === 'snow' ? 0 : outdoor ? this.weather.rain : this.weather.rain * .25; // snowy places: rain falls as (silent) snow
     if (!this.beds.rain) this.beds.rain = this.mkBed('rain'); this.bedLevel('rain', rain * .35, 2);
     if (this.profile.beds.wind !== undefined || outdoor) { if (!this.beds.wind) this.beds.wind = this.mkBed('wind'); this.bedLevel('wind', ((this.profile.beds.wind || 0) + (outdoor ? this.weather.wind * .25 : 0)), 2); }
   },

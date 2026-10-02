@@ -100,7 +100,7 @@ Scenes.port = { hd: true, timeRuns: true,
       L.sort((a, b) => a[0] - b[0]); for (const [, f] of L) f();
       HD.layer('top'); Particles.draw(false); HD.groundLayer('top');
       Light.begin(mixA(World.ambient(), [255, 250, 240], .35)); Light.add(150, 200, 70, '#ffd070', .3 + nk * .7, .2); Light.add(500, 200, 70, '#ffd070', .3 + nk * .7, .2); Light.add(230, 200, 90, '#ffb060', nk * .7, .1); Light.apply();
-      HD.screenLayer(); if (World.rain > .05) Weather.draw(400, World.rain * .6); return;
+      HD.screenLayer(); outdoorWeather(400, .6); return;
     }
     const c = ctx; c.setTransform(1, 0, 0, 1, 0, 0); P('#1a4a7a', 0, 0, 640, 360); Cam.apply(c, 1); c.drawImage(portGround(), 0, 0);
     for (let i = 0; i < 30; i++) { const x = (i * 53 + t * 6) % 640, y = 20 + (i * 37) % 160; if (Math.sin(t * 2 + i) > .4) P('#c8e8ff', x, y, 4, 1); }
@@ -108,7 +108,7 @@ Scenes.port = { hd: true, timeRuns: true,
     const L = []; for (const [a, x, y] of statics) L.push([y, () => c.drawImage(a.c, Math.round(x - a.bx), Math.round(y - a.by))]); for (const [x, y, fn] of figs) L.push([y + .5, fn]);
     L.sort((a, b) => a[0] - b[0]); for (const [, f] of L) f(); Particles.draw(false);
     Light.begin(mixA(World.ambient(), [255, 250, 240], .35)); Light.add(150, 200, 70, '#ffd070', .3 + nk * .7, .2); Light.add(500, 200, 70, '#ffd070', .3 + nk * .7, .2); Light.apply(); c.setTransform(1, 0, 0, 1, 0, 0);
-    if (World.rain > .05) Weather.draw(400, World.rain * .6);
+    outdoorWeather(400, .6);
   },
   ui() {
     HUD.draw({ buttons: [['MAP', () => this.use('map'), 'Set out', 56], ['SAIL', () => this.use('boat'), 'Sail home', 56], ['★', () => openAchievements(), 'Achievements'], ['❧', () => openLore(), 'Lore'], ['GEAR', () => openGear(), 'Gear', 56]] });

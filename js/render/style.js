@@ -179,8 +179,10 @@ const Gfx = {
     this.tWarm += dt; if (this.tWarm < 2.5) { this.tAcc = 0; this.tN = 0; return; }
     this.tAcc += dt; this.tN++; if (this.tAcc < 1.5) return;
     const avg = this.tAcc / this.tN; this.tAcc = 0; this.tN = 0;
-    if (avg > 1 / 50 && this.trim < 3) { if (++this.tSlow >= 2) { this.tSlow = 0; this.trim++; this.tWarm = 1.5; if (!this.tToast) { this.tToast = 1; Toast.add('HIGH: trimming heavy effects to stay smooth', COL.gold2, '⚙'); } } }
-    else this.tSlow = 0; // (no automatic step back up: avoids see-sawing; re-pick HIGH in Settings to reset)
+    if (avg > 1 / 50 && this.trim < 3) { this.tGood = 0; if (++this.tSlow >= 2) { this.tSlow = 0; this.trim++; this.tWarm = 1.5; if (!this.tToast) { this.tToast = 1; Toast.add('HIGH: trimming heavy effects to stay smooth', COL.gold2, '⚙'); } } }
+    else { this.tSlow = 0;
+      // step back up once things are cheap again (e.g. night -> day). Limited to a few times per session so it can't see-saw.
+      if (this.trim > 0 && avg < 1 / 58 && (this.tUps || 0) < 3) { this.tGood = (this.tGood || 0) + 1.5; if (this.tGood >= 12) { this.tGood = 0; this.trim--; this.tUps = (this.tUps || 0) + 1; this.tWarm = 1.5; } } else this.tGood = 0; }
   },
   // called once per frame with the real frame interval
   tick(dt) {

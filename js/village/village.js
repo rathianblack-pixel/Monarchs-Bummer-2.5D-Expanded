@@ -434,7 +434,7 @@ Scenes.village = { hd: true,
     // ---- lighting ----
     Light.begin(World.ambient()); const L2 = (x, y, r2, col, a, fl) => Light.add(x, y, r2, col, a, fl);
     const wl = nk;
-    if (wl > .05) { for (const [x, y] of this.windowLights()) L2(x, y, 40, '#ffb050', wl * .9, .08); L2(467, 346, 70, '#ffc060', wl, .12); L2(1120, 200, 50, '#ffc060', wl * .8, .1); L2(B.cath.x + 92, B.cath.y - B.cath.wallH + 16, 40, '#e060a0', wl * .7); for (const f of this.fireflies) L2(f.x + Math.sin(T * .5 + f.p) * 20, f.y, 10, '#c0ff60', nk * .5); }
+    if (wl > .05) { for (const [x, y] of this.windowLights()) L2(x, y, 40, '#ffb050', wl * .9, .08); L2(467, 346, 70, '#ffc060', wl, .12); L2(1120, 200, 50, '#ffc060', wl * .8, .1); L2(B.cath.x + 92, B.cath.y - B.cath.wallH + 16, 40, '#e060a0', wl * .7); for (const f of this.fireflies) Light.add(f.x + Math.sin(T * .5 + f.p) * 20, f.y, 10, '#c0ff60', nk * .5, 0, .35, true); } // fireflies: light-map glow only (not per-pixel / shadow lights)
     L2(PALI - 14, 448, 60, '#ff9040', .5 + wl * .5, .2); L2(PALI - 14, 518, 60, '#ff9040', .5 + wl * .5, .2);
     L2(B.smith.x + 30, B.smith.y - 14, 70, '#ff7a30', .8, .25); if (World.lightning > 0) L2(Cam.x, Cam.y, 600, '#ffffff', World.lightning);
     if (typeof Life !== 'undefined') Life.villageLights(L2, nk);
@@ -530,7 +530,7 @@ Scenes.village = { hd: true,
     const hw = (k, list) => { const b = B[k], yW = b.y - b.wallH; return list.map(([wx, wy, ww, wh]) => [b.x + wx, yW + wy, ww, wh]); };
     return [...hw('house', [[18, 12, 16, 14], [104, 12, 16, 14]]), ...hw('merchant', [[18, 12, 22, 14], [118, 12, 22, 14]]), ...hw('smith', [[124, 12, 18, 12]])];
   },
-  windowLights() { return this.windowDefs().map(([x, y, w, h]) => [x + w / 2, y + h / 2]); },
+  windowLights() { return this._wl || (this._wl = this.windowDefs().map(([x, y, w, h]) => [x + w / 2, y + h / 2])); },
   drawWindows(t, nk) {
     for (const [x, y, w, h] of this.windowDefs()) { const f = .85 + .15 * noise1(t * 2 + x); const col = mix('#3a4a7a', '#ffc860', nk * f); P(col, x, y + 2, w / 2 - 1, h / 2 - 3); P(col, x + w / 2 + 1, y + 2, w / 2 - 1, h / 2 - 3); P(col, x, y + h / 2 + 1, w / 2 - 1, h / 2 - 1); P(col, x + w / 2 + 1, y + h / 2 + 1, w / 2 - 1, h / 2 - 1); if (nk < .3) { P('rgba(255,255,255,.55)', x + 1, y + 2, 2, 1); P('rgba(255,255,255,.35)', x + w / 2 + 2, y + h / 2 + 2, 1, 1); } }
     // cathedral stained glass + rose window

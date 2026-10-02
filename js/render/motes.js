@@ -61,7 +61,7 @@ const COMBAT_FX = {
   8: { sh: [.65, 160, -80, [1, .95, .85]], m: { n: 45, rise: 5 } },
   9: { sh: [.45, 320, -60, [1, .7, .88]], m: { n: 60, col: '#ffc8e8', a: .5 } }
 };
-function combatShafts(area, raid) { if (raid) return sunShafts({ base: .5, x0: 60 }); const f = COMBAT_FX[area]; return f ? f.sh : null; }
+function combatShafts(area, raid) { if (raid) return sunShafts({ base: .5, x0: 60 }); const f = COMBAT_FX[area]; if (!f) return null; const k = typeof ARENA_SKY !== 'undefined' && ARENA_SKY[area] ? ARENA_SKY[area] * World.rain : 0; if (k > .7) return null; return k > .02 ? [f.sh[0] * (1 - k), f.sh[1], f.sh[2], f.sh[3]] : f.sh; } // rain clouds dim the light shafts in open-sky arenas
 function combatMotes(area, raid) { if (raid) return { n: 40 }; const f = COMBAT_FX[area]; return f ? f.m : { n: 40 }; }
 function combatShimmer(sc) {
   if (!HD.cfg) return; const f = !sc.raid && COMBAT_FX[sc.area]; if (f && f.shim) HD.cfg.shimmer = f.shim.slice();

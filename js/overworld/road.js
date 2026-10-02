@@ -62,7 +62,7 @@ Scenes.road = {
     drawChar(this.px, 314, playerLook({ s: 1.5, face: 1, t, walk: this.state !== 'talk' ? t * 10 : undefined, talking: pSpeak, low: S.hp / Stats.maxHP() < .3 }));
     Particles.draw(false);
     Light.begin(World.ambient(a >= 2 ? .6 : 1)); if (World.nightK() > .2) Light.add(this.px, 260, 90, '#ffd8a0', .6 * World.nightK()); Light.apply();
-    c.setTransform(1, 0, 0, 1, 0, 0); if (World.rain > .05) Weather.draw(300); Weather.fog(World.fog + (a === 2 ? .6 : 0), '#c8c0d8', Cam.x);
+    c.setTransform(1, 0, 0, 1, 0, 0); outdoorWeather(300); Weather.fog(World.fog + (a === 2 ? .6 : 0), '#c8c0d8', Cam.x);
   },
   ui() {
     UI.text('ON THE ROAD', 640, 42, { align: 'center', size: 22, col: COL.gold2 }); UI.text(`${AREAS[this.a.area].name} · a stranger blocks the path`, 640, 64, { align: 'center', size: 14, col: COL.dim, bold: false, italic: true });

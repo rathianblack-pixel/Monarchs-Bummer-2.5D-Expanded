@@ -99,8 +99,8 @@ const Life = {
 }
 { const flakes = Array.from({ length: 150 }, () => ({ x: rnd(CONFIG.LW), y: rnd(CONFIG.LH), s: rnd(.5, 1.5), p: rnd(10) }));
   const _wd = Weather.draw;
-  Weather.draw = function (groundY, amt, indoor) {
-    _wd.apply(this, arguments); const k = Life.snow; if (k < .02 || indoor) return;
+  Weather.draw = function (groundY, amt, indoor, snowK) {
+    _wd.call(this, groundY, amt, indoor); const k = snowK !== undefined ? snowK : Life.snow; if (k < .02 || indoor) return;
     const c = HD.live ? HD.scrx : wctx; c.setTransform(1, 0, 0, 1, 0, 0); const n = Math.floor(flakes.length * k);
     for (let i = 0; i < n; i++) { const f = flakes[i]; f.y += (16 + 22 * f.s) * DT; f.x += (Math.sin(T * 1.2 + f.p) * 10 + World.wind * 30) * DT * f.s; if (f.y > CONFIG.LH + 2) { f.y = -4; f.x = rnd(-20, CONFIG.LW); } if (f.x > CONFIG.LW + 4) f.x -= CONFIG.LW + 8; if (f.x < -6) f.x += CONFIG.LW + 8;
       c.globalAlpha = .55 + f.s * .3; c.fillStyle = '#ffffff'; const sz = f.s > 1.2 ? 2 : 1; c.fillRect(Math.round(f.x), Math.round(f.y), sz, sz); }

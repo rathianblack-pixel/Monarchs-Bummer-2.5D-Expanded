@@ -1,5 +1,48 @@
 # Changelog
 
+## v4.4 — Weather everywhere, scarier monsters
+**Weather**
+- **Interiors:** no more rain falling inside rooms. The house window still shows the rain outside, and indoor rain sounds stay muffled.
+- **Battles follow the world weather:** rain (and snow) used to appear only in Placenta Creek (area 1) and during raids. Every open-sky arena now gets it, scaled by how sheltered it is: Grave Mistake and Brinebottom Shores 100%, Questionable Decisions 85%, Mild Inconvenience 55% (under the canopy), Grinhaven 100%. Rain clouds also dim the arena's light shafts.
+- **Stays dry:** Dread Fortress (indoors), Sunken City of Glub (underwater), The High Horse (above the clouds).
+- **The Cold Shoulder:** rain falls as snow there, and the rain sound is muted.
+- **Snow was missing almost everywhere:** snowfall was only drawn when it was also raining. The overworld maps, the road, Port Mopeway and battles now show snow on their own. All outdoor scenes go through one helper, `outdoorWeather()`.
+- **Sailing cutscene:** now shows rain and snow too.
+
+**Monsters** (`js/characters/monsters_fx.js`)
+Every non-humanoid creature gets an extra detail pass on top of its existing rig, so all poses and animations are unchanged:
+- **Act I:** spines and hackles, fangs and snarls, glowing slit eyes, claws, scars, fur texture.
+- **Per creature:** the rat oozes pustules, the raccoon foams, the zombie wolf has stitches and flies, the timberwolf grows branch antlers, Gloomfang gets horns, the wraith shows a skull and ribs, and the mimic walks on spider legs with an eye in its lock and a tongue.
+- **Act II:** the crab, gull, harpy, jellyfish, angler, clam, eels, penguin, yetis, sheep, horses and balloons get the same treatment, keeping their joke accessories.
+- **The Bummer (the whale)** is left as-is on purpose.
+- **Toggle:** set `Settings.monsterDetail = false` to bring back the old look.
+
+## v4.3.1 — Night performance, part 2
+Night still ran slower than day, mostly on the GPU: after dark the village goes from 3 lights to 43, and the per-pixel sprite shader filled all 8 light slots for every sprite pixel.
+- **Per-pixel lights at night:** full HIGH now uses the 4 strongest on-screen lights after dark (`CONFIG.NIGHT_PIXEL_LIGHTS`); day keeps 8. Off-screen and very faint lights are never picked. The light map still contains every light, so the glow looks the same.
+- **Shader:** lights that can't reach a pixel are skipped early instead of being fully computed.
+- **Fireflies:** their 26 lights now only add glow to the light map. They no longer compete for per-pixel slots or affect shadows.
+- **Light map:** image smoothing and alpha are set once per frame instead of once per light; invisible lights are skipped.
+- **Dusk/dawn hitches:** when cached buildings change version as night falls, at most 2 are re-captured per frame (`CONFIG.RECAPTURES_PER_FRAME`), so the rebuild is spread over a few frames instead of landing in one.
+- **Adaptive HIGH:** after trimming (e.g. during a heavy night), it now steps back up after 12 s of smooth play, at most 3 times per session.
+
+## v4.3 — HD humanoids
+The HD renderer from v4.2 now draws every humanoid: villagers, shopkeepers, companions (Lucien, Pell), and human enemies and bosses in both acts. Settings → Hero sprite was renamed **Character sprites** and switches all of them at once.
+- **Supported looks:** every hair style (short, long, bun, curly, spiky, bald, hood) and every hat (crowns including the burning one, helmet, cap, straw hat, top hat, feathered hat, wizard hat, head scarf, dark hood). Every head type except the bull (skull, orc, goblin, mummy, knight helm with visor and plume), plus beards, moustaches, glasses, sweat and red noses. Also robes with swinging hems, aprons, stoles, crosses, fur collars, capes, tabards, mail and plate, torn clothes, sitting poses, books and shields, and every weapon in the game.
+- **Colours:** they now stay true for very dark and very light outfits. Black robes and black hair stay black, with cool highlights instead of turning brown.
+- **Shading:** human enemies skip the old generic sprite shading pass, so they aren't shaded twice.
+- **Exception:** the Minotaur's bull head still uses the classic renderer.
+- **Speed:** the frame cache now holds 320 poses, enough for a full village. Figures with moving parts (flames, long hair, plumes, capes) update at 12 fps.
+
+## v4.2 — HD hero sprite
+The player character has a new renderer (`js/characters/hero_hd.js`). The old one is still in Settings → Hero sprite → CLASSIC.
+- **Shaded like a 3D figure:** each frame, the hero is built from rounded shapes (head, hair, torso, limbs, boots, gear), lit from the upper left with a rim light on the far side, and drawn at one pixel per world pixel (two on HIGH, to match its sharper sprites).
+- **Better colour:** each material uses 6 shades that turn cooler in shadow and warmer in light. Only metal, glass, hair and leather get highlights. There is light dithering, dark lines where parts overlap, and an outline tinted by the part it surrounds.
+- **More detail:** a stitched patch tunic with a folded-down hood (tier 0), a leather jerkin with a strap and bracer (1), mail with a tabard (2), plate with pauldrons (3), and gilded plate with a cape (4). The Bow class wears a quiver, the Sword class an empty scabbard, and spellcasters a scarf and sash in their element's colour. Bows, swords and staffs have a new look for every weapon tier, with an animated flame, water orb or light orb on the staff.
+- **Same animation as before:** poses, the 8-key walk, breathing, blinks, expressions, the cape physics, hit flashes, skin tones, hair colours and body types all carry over. The hero is drawn this way everywhere: battles, the village, interiors, the map, the road, cutscenes, character creation, the gallery and the anim lab.
+- **Cost:** frames are cached by pose, so an idle hero is nearly free. A new pose takes about 1–1.5 ms to draw (classic: about 0.3 ms).
+- NPCs, companions and enemies still use the old renderer.
+
 ## v4.1.1 — Night performance
 Night had about 15× more lights than day (43 vs 3 in the village), and two things got more expensive with every light:
 - **Light map:** every light used to build a brand-new radial gradient every frame (43 at night). Light blobs are now pre-rendered once per colour and reused, lights outside the visible area are skipped, and the light texture is updated in place. Same look; 0 gradients per frame instead of 43. The 2D/LOW renderer got the same fix, including its glow pass.

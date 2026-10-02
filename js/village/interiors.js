@@ -37,7 +37,7 @@ function makeInterior(cfg) {
       Cam.apply(c, 1.15); cfg.front && cfg.front.call(this, this.t);
       c.setTransform(1, 0, 0, 1, 0, 0); Cam.apply(c, 1);
       Light.begin(mixA(World.ambient(.35), cfg.ambient || [120, 100, 110], .6)); cfg.lights.call(this, this.t); Light.apply();
-      c.setTransform(1, 0, 0, 1, 0, 0); if (World.rain > .1) Weather.draw(360, World.rain * .3, true);
+      c.setTransform(1, 0, 0, 1, 0, 0); // (indoors: no rain overlay - the rain shows through the windows)
       cfg.post && cfg.post.call(this, this.t);
     },
     ui() {
